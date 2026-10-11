@@ -19,56 +19,107 @@ A fashion analytics pipeline that runs daily in GitHub Actions. It reads the RSS
 
 ## Dataset Overview
 <!-- DATASET_OVERVIEW_START -->
-**Last Updated:** 2026-10-10 06:48:27 UTC
+**Last updated:** 2026-10-11 07:02 UTC
 
-- **Total Days/Files:** 119
-- **Total Outfits:** 1457
+- **Schema 2.0 records:** 120 outfits from 26 posts of 20 sources, published 2026-09-11 to 2026-10-07
+- **Images reused across posts:** 0
+- **Legacy records (schema 1.x):** 1,457 records in 119 files (2026-06-14 to 2026-10-10); collected without deduplication and without publish dates, and not included in the tables below
+- **Sources:** 20 active, 21 probation, 74 dormant, 7 broken, 32 rejected, 0 retired
 
-| Variable | Description | Fill Rate | Distinct Values |
-|----------|-------------|-----------|-----------------|
-| `accessories` | List of visible accessories. | 86.6% (1262) | 565 |
-| `age_group` | Visually estimated age bracket. | 94.0% (1370) | 6 |
-| `bottom_garment_type` | The type of bottom being worn. | 59.8% (872) | 341 |
-| `brand_mentions` | Fashion brands explicitly mentioned. | 11.7% (171) | 90 |
-| `clothing_fit` | The overall fit of the clothing. | 93.9% (1368) | 4 |
-| `clothing_style` | The primary fashion style. | 100.0% (1457) | 269 |
-| `color_contrast_strategy` | How colors are paired. | 44.3% (646) | 5 |
-| `color_palette_type` | The overall color theory of the outfit. | 94.0% (1370) | 5 |
-| `confidence_score` | Model confidence score (0.0 to 1.0). | 100.0% (1457) | 10 |
-| `date_scraped` | Automatically injected date. | 100.0% (1457) | 119 |
-| `embellishments` | Visible decorative details. | 10.0% (146) | 94 |
-| `fabric_textures` | Visually inferred materials. | 93.9% (1368) | 324 |
-| `focal_point` | The standout piece that draws the eye. | 93.9% (1368) | 821 |
-| `footwear_type` | The type of shoes being worn. | 34.8% (507) | 191 |
-| `gender` | The perceived gender of the subject. | 100.0% (1457) | 3 |
-| `hair_accessories` | Specific hair accessories. | 2.5% (36) | 21 |
-| `hair_color` | Subject's hair color. | 93.0% (1355) | 79 |
-| `hair_finish` | The styling finish of the hair. | 44.2% (644) | 6 |
-| `hair_parting` | How the hair is parted. | 44.2% (644) | 5 |
-| `hairstyle` | The primary hairstyle of the subject. | 100.0% (1457) | 693 |
-| `hardware_details` | Visible metal or structural components. | 20.5% (299) | 149 |
-| `hemline_length` | The hemline length for bottoms. | 17.7% (258) | 6 |
-| `image_url` | Image URL of the subject (GDPR compliant). | 0.9% (13) | 12 |
-| `is_trendsetter` | True if celebrity/model/artist, False if regular person. | 100.0% (1457) | 2 |
-| `layering_complexity` | Scale from 1 (simple) to 5 (heavy layering). | 94.0% (1369) | 4 |
-| `makeup_style` | Subject's makeup style. | 94.0% (1369) | 40 |
-| `material_finish` | The optical quality of the fabrics. | 44.2% (644) | 4 |
-| `neckline_style` | The cut of the top/dress around the neck. | 40.5% (590) | 7 |
-| `occasion` | Intended event or setting for the outfit. | 44.3% (646) | 5 |
-| `patterns` | Patterns visible on the clothing. | 94.0% (1369) | 234 |
-| `pose_or_activity` | What the subject is doing. | 94.0% (1369) | 293 |
-| `price_segment` | Inferred price segment. | 94.0% (1370) | 4 |
-| `primary_colors` | List of dominant colors in the outfit. | 100.0% (1457) | 106 |
-| `region` | Geographic region identified from context ('EU' or 'US'). | 100.0% (1457) | 2 |
-| `seasonality` | The inferred season. | 94.0% (1370) | 5 |
-| `sentiment_or_vibe` | The aesthetic vibe described. | 93.8% (1367) | 472 |
-| `setting` | The setting or background of the photo. | 94.0% (1370) | 5 |
-| `silhouette` | The overall outline or shape of the outfit. | 43.0% (626) | 6 |
-| `source_url` | The URL of the webpage where the image was found. | 100.0% (1457) | 223 |
-| `subculture_aesthetic` | Specific internet aesthetics or micro-trends. | 6.2% (91) | 50 |
-| `top_garment_type` | The type of top being worn. | 93.3% (1359) | 657 |
-| `waistline_rise` | The rise of the bottoms. | 27.5% (400) | 3 |
-| `weather_conditions` | Inferred weather. | 77.1% (1123) | 46 |
+**Active sources** (posts processed since admission)
+
+| Source | Country | Posts | Posts with outfits | Last post |
+|---|---|---|---|---|
+| awellstyledlife.com | US | 2 | 100.0% (2) | 2026-10-10 |
+| midlifechic.com | GB | 2 | 100.0% (2) | 2026-10-09 |
+| pumpsandpushups.com | US | 2 | 100.0% (2) | 2026-10-09 |
+| reneeruin.com | AU | 2 | 100.0% (2) | 2026-10-10 |
+| sewliberated.com | US | 2 | 100.0% (2) | 2026-09-15 |
+| thefashiontag.com | GB | 2 | 50.0% (1) | 2026-10-08 |
+| theoutfitrepeater.com | US | 2 | 100.0% (2) | 2026-09-22 |
+| youlookfab.com | US | 2 | 50.0% (1) | 2026-10-09 |
+| beauticurve.com | US | 1 | 100.0% (1) | 2026-10-01 |
+| poplinstyle.com | US | 1 | 100.0% (1) | 2026-09-11 |
+| russh.com | AU | 1 | 100.0% (1) | 2026-10-07 |
+| thewelldressedlife.com | US | 1 | 100.0% (1) | 2026-10-01 |
+| caphillstyle.com | US | 0 | 0.0% (0) | 2026-10-09 |
+| capitolhillstyle.com | US | 0 | 0.0% (0) | 2026-10-09 |
+| fashionjackson.com | US | 0 | 0.0% (0) | 2026-09-17 |
+| lemonstripes.com | US | 0 | 0.0% (0) | 2026-09-24 |
+| livinginyellow.com | US | 0 | 0.0% (0) | 2026-10-10 |
+| lovemaegan.com | US | 0 | 0.0% (0) | 2026-09-27 |
+| phyrra.net | NL | 0 | 0.0% (0) | 2026-10-06 |
+| vstyleblog.com | US | 0 | 0.0% (0) | 2026-09-28 |
+
+**Fields (schema 2.0)**
+
+| Field | Description | Known values | Distinct values |
+|---|---|---|---|
+| `framing` | Widest view of the person among the images of this outfit. | 100.0% (120) | 3 |
+| `photo_context` | Who is shown: the blogger or another private person, models in a brand campaign or catalog image, or an editorial or street-style photo. | 88.3% (106) | 3 |
+| `gender` | Perceived gender presentation of the person. | 100.0% (120) | 2 |
+| `age_group` | Visually estimated age bracket of the person. | 100.0% (120) | 2 |
+| `style_category` | Primary style of the outfit. | 100.0% (120) | 10 |
+| `style_detail` | Refinement of the style in a few words, e.g. 'Relaxed weekend minimalism'. Null if not needed. | 50.0% (60) | 50 |
+| `aesthetic_tags` | Named aesthetics or micro-trends that the outfit clearly represents. Empty list if none. | 5.8% (7) | 5 |
+| `aesthetic_other` | A clearly represented aesthetic that is not in the list, in one to three words. Null if none. | 6.7% (8) | 7 |
+| `focal_garment_index` | Position (starting at 1) in the garments list of the piece that draws the eye most. Null if no piece stands out. | 89.2% (107) | 4 |
+| `layering_complexity` | Number of visible clothing layers on the upper body, from 1 (single layer) to 5 (heavy layering). | 100.0% (120) | 3 |
+| `overall_fit` | Overall fit of the outfit. | 100.0% (120) | 4 |
+| `silhouette` | Overall outline of the outfit. | 90.8% (109) | 5 |
+| `color_palette_type` | Overall color character of the outfit. | 100.0% (120) | 5 |
+| `color_contrast_strategy` | How the colors of the outfit are combined. | 100.0% (120) | 5 |
+| `occasion` | Most likely occasion the outfit is meant for. 'Unclear' if the images and text give no indication. | 95.8% (115) | 5 |
+| `setting` | Setting or background of the photos. | 100.0% (120) | 3 |
+| `season` | Season suggested by the clothing and the surroundings. 'Unclear' if they give no indication. | 69.2% (83) | 4 |
+| `weather` | Weather visible in the photos. 'Not visible' for indoor photos and whenever sky or conditions cannot be seen. | 24.2% (29) | 2 |
+| `hair_length` | Hair length of the person. | 95.8% (115) | 4 |
+| `hair_texture` | Hair texture of the person. | 95.0% (114) | 4 |
+| `hair_style_type` | How the hair is worn. | 95.0% (114) | 6 |
+| `hair_color` | Hair color of the person. | 95.0% (114) | 6 |
+| `hair_parting` | How the hair is parted. | 95.0% (114) | 4 |
+| `hair_finish` | Styling finish of the hair. | 95.0% (114) | 4 |
+| `makeup_style` | Makeup style of the person. | 95.0% (114) | 2 |
+| `brand_mentions` | Brands of this outfit that are named in the post title, text, tags, image captions or link texts. Do not infer brands from appearance. Empty list if none. | 52.5% (63) | 31 |
+| `price_segment` | Price segment suggested by the named brands or the text. 'Unknown' without such evidence. | 24.2% (29) | 3 |
+| `record_id` | Stable id derived from the post URL, the image hashes and the position of the outfit in the post. | 100.0% (120) | 120 |
+| `schema_version` | Version of the record schema. | 100.0% (120) | 1 |
+| `model` | Gemini model that produced the record. | 100.0% (120) | 1 |
+| `extraction_hash` | Hash of the prompt, response schema, model settings and image preprocessing. Records with the same hash were extracted under the same conditions. | 100.0% (120) | 1 |
+| `date_scraped` | UTC date of the extraction (YYYY-MM-DD). | 100.0% (120) | 1 |
+| `published_date` | Publish date of the post from its feed (YYYY-MM-DD). | 100.0% (120) | 16 |
+| `source_id` | Domain of the blog, without www. | 100.0% (120) | 20 |
+| `source_country` | ISO 3166-1 alpha-2 country of the blog. Null if unknown. | 93.3% (112) | 4 |
+| `source_country_basis` | How the country was determined: model (Gemini with web search), domain (country-code top-level domain), feed_language (region of the RSS language tag) or unknown. | 100.0% (120) | 3 |
+| `source_region` | Region derived from source_country. | 93.3% (112) | 3 |
+| `source_language` | Language of the blog from its feed (ISO 639-1). | 100.0% (120) | 1 |
+| `post_url` | URL of the post. | 100.0% (120) | 26 |
+| `canonical_url` | Canonical URL declared by the post page. | 52.5% (63) | 11 |
+| `post_title` | Title of the post. | 100.0% (120) | 26 |
+| `post_tags` | Categories and tags of the post from its feed. | 95.8% (115) | 130 |
+| `shopping_link_count` | Number of links to shops or affiliate networks in the post. | 100.0% (120) | 9 |
+| `outfit_colors` | Primary colors of the clothing and footwear, in the order of the garments list. | 100.0% (120) | 20 |
+
+**Garments**
+
+| Category | Items | Outfits with this category |
+|---|---|---|
+| Top | 93 | 70.0% (84) |
+| Bottom | 78 | 65.0% (78) |
+| Dress/One-piece | 25 | 20.8% (25) |
+| Outerwear | 25 | 20.8% (25) |
+| Footwear | 78 | 65.0% (78) |
+| Bag | 38 | 31.7% (38) |
+| Headwear | 1 | 0.8% (1) |
+| Eyewear | 19 | 15.8% (19) |
+| Jewelry | 109 | 58.3% (70) |
+| Belt | 20 | 16.7% (20) |
+| Scarf/Neckwear | 10 | 8.3% (10) |
+| Hair accessory | 1 | 0.8% (1) |
+| Hosiery | 9 | 7.5% (9) |
+| Other | 5 | 3.3% (4) |
+
+Most frequent garment types: Earrings (41), Trousers (35), Necklace (29), Jeans (29), Sandals (29), Dress (24), T-shirt (22), Belt (20), Sweater (18), Tote (18), Ring (16), Tank top/Camisole (15), Bracelet (15), Button-up shirt (14), Ankle boots (14).
 <!-- DATASET_OVERVIEW_END -->
 
 ## Pipeline Architecture
