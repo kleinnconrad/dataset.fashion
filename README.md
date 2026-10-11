@@ -1,7 +1,7 @@
 # Fashion Analytics Scraper
 [![CI](https://github.com/kleinnconrad/style_dataset/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kleinnconrad/style_dataset/actions/workflows/ci.yml)
 
-A fashion analytics pipeline that runs daily in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-2.5-flash`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
+A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-2.5-flash`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
 
 ## Table of Contents
 - [Dataset Overview](#dataset-overview)
@@ -135,7 +135,7 @@ sequenceDiagram
     participant Gemini as Gemini API
     participant Store as storage.py / state.py
 
-    Action->>Run: Daily run (01:00 UTC)
+    Action->>Run: Pipeline run (Tuesdays and Fridays, 02:07 Europe/Berlin)
     Run->>Reg: Load the source registry (seed it from the legacy records if empty)
     Run->>Feeds: Fetch the feeds of active and probation sources
     Feeds-->>Run: Selected posts (new posts and posts due for a retry)
@@ -173,7 +173,7 @@ sequenceDiagram
 | `active` to `retired` | Fewer than 25% of the last 12 processed posts produced an outfit. |
 | To `dormant` | No post for more than 90 days. |
 | Back from `dormant` | At least 2 posts in the last 60 days, checked weekly. The source returns to its previous status. |
-| To `broken` | The feed failed on 7 consecutive daily runs. It is checked weekly and returns to its previous status when the feed works again. |
+| To `broken` | The feed failed on 7 consecutive pipeline runs (about three and a half weeks). It is checked weekly and returns to its previous status when the feed works again. |
 
 Further rules:
 - Known domains are never proposed again, so `rejected` and `retired` sources stay out.
@@ -199,7 +199,7 @@ Each record describes one outfit of one person in one post. The models are defin
 | `data/state/sources.json` | Source registry |
 | `data/state/posts.json` | Processed posts with status and attempts |
 | `data/state/images.json` | dHashes of all analyzed images |
-| `data/state/run_log.jsonl` | One line per daily or weekly run, with counters and token usage |
+| `data/state/run_log.jsonl` | One line per pipeline run or weekly maintenance run, with counters and token usage |
 
 The state files have a version key and one entry per line, and they are written atomically after every post.
 
@@ -207,7 +207,7 @@ The state files have a version key and one entry per line, and they are written 
 
 | Workflow | Schedule | Purpose |
 |---|---|---|
-| `daily_scraper.yml` | Daily, 01:00 UTC | Runs the pipeline, updates the overview and commits `data/` and `README.md` |
+| `daily_scraper.yml` | Tuesdays and Fridays, 02:07 Europe/Berlin | Runs the pipeline, updates the overview and commits `data/` and `README.md` |
 | `source_discovery.yml` | Sundays, 12:00 UTC | Re-checks dormant and broken sources, looks up countries, discovers new blogs and commits `data/state/` |
 | `email_notify.yml` | After data commits | Posts a commit comment that mentions the repository owner |
 | `ci.yml` | Pull requests, pushes to `main` | Lint, tests and commit message checks |
@@ -217,7 +217,7 @@ The two data workflows share a concurrency group, so they never push at the same
 Manual runs (`workflow_dispatch`) accept a `mode`:
 - `normal`: same as the scheduled run.
 - `shadow`: runs on a copy of the state in a temporary folder and uploads it as an artifact; nothing is committed. Shadow runs use the same API key and quota as the scheduled runs.
-- `dry-run` (daily workflow only): no model calls; uploads a report of the selected posts and images.
+- `dry-run` (`daily_scraper.yml` only): no model calls; uploads a report of the selected posts and images.
 
 ## Configuration
 
@@ -225,11 +225,11 @@ Manual runs (`workflow_dispatch`) accept a `mode`:
 |---|---|---|
 | `GEMINI_API_KEY` | none | API key for Gemini (required) |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Model for extraction and discovery; stored in every record |
-| `MAX_POSTS_PER_RUN` | 40 | Posts per daily run |
+| `MAX_POSTS_PER_RUN` | 40 | Posts per pipeline run |
 | `MAX_POSTS_PER_SOURCE` | 3 | Posts per source and run |
 | `MAX_PROBATION_POSTS_PER_RUN` | 10 | Posts from sources on probation per run |
 | `MAX_IMAGES_PER_POST` | 8 | Images per Gemini request |
-| `MAX_GEMINI_CALLS_PER_RUN` | 50 | Gemini requests per daily run, including retries |
+| `MAX_GEMINI_CALLS_PER_RUN` | 50 | Gemini requests per pipeline run, including retries |
 | `FEED_LOOKBACK_DAYS` | 30 | Age limit of new posts; unfinished posts are given up after this period |
 
 Fixed thresholds, such as the lifecycle rules, are constants in the modules that use them.
@@ -244,7 +244,7 @@ uv run python src/main.py --max-posts 5               # processes 5 posts
 uv run python src/discovery.py                        # weekly maintenance
 ```
 
-Local runs write to `~/Downloads/style_dataset/` unless `--output-dir` is given; in GitHub Actions they write to `data/`. `--source DOMAIN` restricts a daily run to one or more sources. `scripts/try_extraction.py` runs the extraction on a fixed set of posts and writes an HTML review sheet.
+Local runs write to `~/Downloads/style_dataset/` unless `--output-dir` is given; in GitHub Actions they write to `data/`. `--source DOMAIN` restricts a pipeline run to one or more sources. `scripts/try_extraction.py` runs the extraction on a fixed set of posts and writes an HTML review sheet.
 
 ## Dependency Management
 
@@ -276,6 +276,6 @@ uv run pytest
 
 1. Add the repository secret `GEMINI_API_KEY` under **Settings > Secrets and variables > Actions**. For local runs, put it into a `.env` file.
 2. Allow workflows to push to the repository under **Settings > Actions > General > Workflow permissions**.
-3. The first daily run seeds the source registry from the legacy records, which takes about a minute.
+3. The first pipeline run seeds the source registry from the legacy records, which takes about a minute.
 
 Copyright (c) 2026 Conrad Kleinn. All rights reserved.

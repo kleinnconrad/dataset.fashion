@@ -1,6 +1,6 @@
 # Fashion Analytics Pipeline: `src/` Directory
 
-This directory contains the modules of the pipeline. The modules import each other as top-level modules; the entry points are `main.py` (daily run), `discovery.py` (weekly run) and `generate_dataset_overview.py` (README overview).
+This directory contains the modules of the pipeline. The modules import each other as top-level modules; the entry points are `main.py` (pipeline run), `discovery.py` (weekly run) and `generate_dataset_overview.py` (README overview).
 
 ## Table of Contents
 - [Entry Points](#entry-points)
@@ -28,7 +28,7 @@ This directory contains the modules of the pipeline. The modules import each oth
 ## Entry Points
 
 ### `main.py`
-Starts the daily run. Options: `--dry-run` (no model calls, writes a report), `--max-posts`, `--source` and `--output-dir`. Exits with code 1 if Gemini rejects requests and with code 2 if the API key is missing.
+Starts a pipeline run. Options: `--dry-run` (no model calls, writes a report), `--max-posts`, `--source` and `--output-dir`. Exits with code 1 if Gemini rejects requests and with code 2 if the API key is missing.
 
 ### `discovery.py`
 Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs. Option: `--output-dir`.
@@ -39,7 +39,7 @@ Writes the overview between the markers in the repository's `README.md`: summary
 ## Run Orchestration
 
 ### `pipeline.py`
-Executes one daily run (`DailyRun`): refreshes the feeds, selects the posts, processes each post and saves records and state after every post. External services (feeds, pages, images, Gemini) are passed in as `Services`, so that tests can replace them. Counters are written to the run log.
+Executes one pipeline run (`DailyRun`): refreshes the feeds, selects the posts, processes each post and saves records and state after every post. External services (feeds, pages, images, Gemini) are passed in as `Services`, so that tests can replace them. Counters are written to the run log.
 
 ### `settings.py`
 Settings that may change between runs, read from environment variables, and the output folder (`data/` in GitHub Actions, `~/Downloads/style_dataset/` locally).

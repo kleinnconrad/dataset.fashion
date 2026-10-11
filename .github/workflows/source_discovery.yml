@@ -3,7 +3,7 @@ run-name: Weekly source discovery (${{ inputs.mode || 'normal' }})
 
 on:
   schedule:
-    - cron: '0 12 * * 0'   # Sundays 12:00 UTC, away from the daily run at 01:00 UTC
+    - cron: '0 12 * * 0'   # Sundays 12:00 UTC, a day without a pipeline run
   workflow_dispatch:
     inputs:
       mode:
