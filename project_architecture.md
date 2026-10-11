@@ -1,10 +1,10 @@
 # Fashion Analytics Pipeline Architecture
 
-This document describes the structure of the pipeline: the directory layout, the daily and the weekly run, and how failures are handled. The modules are described in [src/README.md](src/README.md).
+This document describes the structure of the pipeline: the directory layout, the pipeline run and the weekly run, and how failures are handled. The modules are described in [src/README.md](src/README.md).
 
 ## Table of Contents
 - [1. Directory Structure](#1-directory-structure)
-- [2. Daily Run](#2-daily-run)
+- [2. Pipeline Run](#2-pipeline-run)
 - [3. Weekly Run](#3-weekly-run)
 - [4. Failure Handling](#4-failure-handling)
 - [5. Setup Steps](#5-setup-steps)
@@ -19,7 +19,7 @@ style_dataset/
 │   ├── dependabot.yml
 │   └── workflows/
 │       ├── ci.yml                  # lint, tests, commit messages
-│       ├── daily_scraper.yml       # daily run, 01:00 UTC
+│       ├── daily_scraper.yml       # pipeline run, Tuesdays and Fridays 02:07 Europe/Berlin
 │       ├── email_notify.yml        # commit comment after data commits
 │       └── source_discovery.yml    # weekly maintenance, Sundays 12:00 UTC
 ├── data/
@@ -36,7 +36,7 @@ style_dataset/
 
 ---
 
-## 2. Daily Run
+## 2. Pipeline Run
 
 `src/main.py` starts the run; `src/pipeline.py` executes it.
 

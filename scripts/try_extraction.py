@@ -2,7 +2,7 @@
 Runs the Gemini extraction on a fixed set of posts and writes an HTML review sheet.
 
 Development tool for checking the schema and the prompt on real posts; the
-daily pipeline does not use it. Images are saved to the output folder only,
+scheduled pipeline does not use it. Images are saved to the output folder only,
 never to the dataset.
 
 The input is a JSON file with a list of posts:

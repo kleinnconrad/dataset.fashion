@@ -1,5 +1,5 @@
 """
-Entry point of the daily pipeline run.
+Entry point of a pipeline run.
 
 Usage:
     uv run python src/main.py [--dry-run] [--max-posts N] [--source DOMAIN ...] [--output-dir PATH]
@@ -40,7 +40,7 @@ def parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
     Returns:
         argparse.Namespace: The parsed arguments.
     """
-    parser = argparse.ArgumentParser(description="Runs the daily fashion analytics pipeline.")
+    parser = argparse.ArgumentParser(description="Runs the fashion analytics pipeline.")
     parser.add_argument("--dry-run", action="store_true",
                         help="select posts and images without calling the model or saving state; writes a report")
     parser.add_argument("--max-posts", type=_positive_int,
