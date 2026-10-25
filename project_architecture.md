@@ -14,7 +14,7 @@ This document describes the structure of the pipeline: the directory layout, the
 ## 1. Directory Structure
 
 ```text
-style_dataset/
+dataset.fashion/
 ├── .github/
 │   ├── dependabot.yml
 │   └── workflows/
