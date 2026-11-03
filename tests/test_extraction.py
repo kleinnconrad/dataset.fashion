@@ -78,9 +78,11 @@ class FakeModels:
     def __init__(self, outcomes: list[Any]) -> None:
         self.outcomes = list(outcomes)
         self.requests: list[list[Any]] = []
+        self.configs: list[Any] = []
 
     def generate_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
         self.requests.append(contents)
+        self.configs.append(config)
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -262,6 +264,16 @@ def test_too_many_images_are_rejected() -> None:
 def test_classify_quota_error_reads_retry_delay() -> None:
     assert classify_quota_error(quota_error(per_day=False, retry_delay="1.5s")) == (False, 1.5)
     assert classify_quota_error(quota_error(per_day=True)) == (True, None)
+
+
+def test_requests_set_a_thinking_level_and_no_sampling_values() -> None:
+    extractor, _, _ = make_extractor([])
+    config = extractor._config
+
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.LOW
+    assert config.thinking_config.thinking_budget is None
+    assert config.temperature is None
+    assert config.media_resolution == types.MediaResolution.MEDIA_RESOLUTION_HIGH
 
 
 def test_extraction_hash_depends_on_the_model() -> None:
