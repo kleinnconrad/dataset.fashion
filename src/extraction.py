@@ -35,9 +35,10 @@ from settings import Settings
 
 logger = logging.getLogger(__name__)
 
-TEMPERATURE = 0.2
-# Caps the hidden reasoning; visual_analysis already makes the model describe the images first
-THINKING_BUDGET: Optional[int] = 2048
+# LOW keeps the hidden reasoning short; visual_analysis already makes the model describe the images first. Gemini 3
+# and later models ignore custom sampling values (temperature, top-k, top-p), and Gemini 2.5 models reject a
+# thinking level.
+THINKING_LEVEL: Optional[types.ThinkingLevel] = types.ThinkingLevel.LOW
 # High resolution keeps details such as fabric texture and necklines visible to the model
 MEDIA_RESOLUTION = types.MediaResolution.MEDIA_RESOLUTION_HIGH
 REQUEST_TIMEOUT_MS = 300_000
@@ -250,8 +251,7 @@ def extraction_hash(settings: Settings) -> str:
         "image_label_template": IMAGE_LABEL_TEMPLATE,
         "schema": describe_models(include_descriptions=True),
         "model": settings.gemini_model,
-        "temperature": TEMPERATURE,
-        "thinking_budget": THINKING_BUDGET,
+        "thinking_level": THINKING_LEVEL,
         "media_resolution": MEDIA_RESOLUTION.value,
         "image_max_side_px": IMAGE_MAX_SIDE_PX,
         "image_jpeg_quality": IMAGE_JPEG_QUALITY,
@@ -605,12 +605,11 @@ class GeminiExtractor:
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
             response_schema=PostExtraction,
-            temperature=TEMPERATURE,
             media_resolution=MEDIA_RESOLUTION,
             # No tools are used; disabling automatic function calling also avoids an SDK warning per call
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             thinking_config=(
-                types.ThinkingConfig(thinking_budget=THINKING_BUDGET) if THINKING_BUDGET is not None else None
+                types.ThinkingConfig(thinking_level=THINKING_LEVEL) if THINKING_LEVEL is not None else None
             ),
         )
         self.usage = UsageTotals()

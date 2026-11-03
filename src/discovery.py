@@ -65,8 +65,9 @@ LOOKUP_REPEAT_DAYS = 180
 CANDIDATES_PER_RUN = 15
 MAX_ADMISSIONS_PER_WEEK = 10
 RECHECK_WORKERS = 8
-COUNTRY_LOOKUP_TEMPERATURE = 0.0
-DISCOVERY_TEMPERATURE = 0.7
+# Google recommends MEDIUM or higher for requests with tools; MINIMAL, the default of gemini-3.5-flash-lite, can end
+# the searches early. At most 12 requests per week; the thinking tokens cost well under one US dollar per month.
+SEARCH_THINKING_LEVEL = types.ThinkingLevel.MEDIUM
 # The focus changes every ISO week, to widen the sample beyond the US-centric legacy sources
 SEARCH_FOCUS = (
     "menswear and men's personal style",
@@ -178,12 +179,11 @@ class SearchModel:
         self._sleep = sleep
         self.calls = 0
 
-    def ask(self, prompt: str, temperature: float) -> SearchAnswer:
+    def ask(self, prompt: str) -> SearchAnswer:
         """Sends a prompt with Google Search enabled.
 
         Args:
             prompt: The prompt.
-            temperature: Sampling temperature.
 
         Returns:
             SearchAnswer: The answer text and the domains of its search sources.
@@ -201,7 +201,7 @@ class SearchModel:
         self.calls += 1
         config = types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
-            temperature=temperature,
+            thinking_config=types.ThinkingConfig(thinking_level=SEARCH_THINKING_LEVEL),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         try:
@@ -363,7 +363,7 @@ def lookup_countries(registry: SourceRegistry, model: Any, today: date) -> int:
         try:
             answers = {
                 answer.domain.strip().lower().removeprefix("www."): answer
-                for answer in parse_answers(model.ask(prompt, COUNTRY_LOOKUP_TEMPERATURE).text, CountryAnswer)
+                for answer in parse_answers(model.ask(prompt).text, CountryAnswer)
             }
         except (TransientExtractionError, ValueError) as e:
             logger.warning("Country lookup for %d sources failed: %s", len(batch), e)
@@ -415,7 +415,7 @@ def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: F
         excluded=known,
     )
     try:
-        answer = model.ask(prompt, DISCOVERY_TEMPERATURE)
+        answer = model.ask(prompt)
     except TransientExtractionError as e:
         logger.warning("Discovery failed: %s", e)
         summary["no answer"] += 1

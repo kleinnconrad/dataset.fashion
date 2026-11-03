@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from google.genai import errors
+from google.genai import errors, types
 
 import discovery as discovery_module
 from discovery import (
@@ -38,7 +38,7 @@ class FakeSearchModel:
         self.prompts: list[str] = []
         self.calls = 0
 
-    def ask(self, prompt: str, temperature: float) -> SearchAnswer:
+    def ask(self, prompt: str) -> SearchAnswer:
         self.calls += 1
         self.prompts.append(prompt)
         answer = self.answers.pop(0)
@@ -236,8 +236,10 @@ class FakeClient:
     def __init__(self, outcome: Any) -> None:
         self.models = SimpleNamespace(generate_content=self.generate_content)
         self.outcome = outcome
+        self.configs: list[Any] = []
 
     def generate_content(self, *, model: str, contents: str, config: Any) -> Any:
+        self.configs.append(config)
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return SimpleNamespace(text=self.outcome)
@@ -257,14 +259,22 @@ class FakeClient:
 def test_search_model_maps_api_errors(outcome: Exception, expected: type) -> None:
     model = SearchModel(Settings(), client=FakeClient(outcome), sleep=lambda s: None)
     with pytest.raises(expected):
-        model.ask("prompt", 0.0)
+        model.ask("prompt")
 
 
 def test_search_model_call_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(discovery_module, "MAX_DISCOVERY_CALLS", 1)
     sleeps: list[float] = []
     model = SearchModel(Settings(), client=FakeClient("[]"), sleep=sleeps.append)
-    assert model.ask("prompt", 0.0) == SearchAnswer(text="[]")
+    assert model.ask("prompt") == SearchAnswer(text="[]")
     with pytest.raises(CallBudgetExceededError):
-        model.ask("prompt", 0.0)
+        model.ask("prompt")
     assert sleeps == []
+
+
+def test_search_model_sets_a_thinking_level_and_no_temperature() -> None:
+    client = FakeClient("[]")
+    SearchModel(Settings(), client=client, sleep=lambda s: None).ask("prompt")
+
+    assert client.configs[0].thinking_config.thinking_level == types.ThinkingLevel.MEDIUM
+    assert client.configs[0].temperature is None

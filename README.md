@@ -1,7 +1,7 @@
 # Fashion Analytics Scraper
 [![CI](https://github.com/kleinnconrad/dataset.fashion/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kleinnconrad/dataset.fashion/actions/workflows/ci.yml)
 
-A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-2.5-flash`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
+A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-3.5-flash-lite`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
 
 ## Table of Contents
 - [Dataset Overview](#dataset-overview)
@@ -202,6 +202,8 @@ Each record describes one outfit of one person in one post. The models are defin
 
 **Legacy records.** The records collected before the switch to schema 2.0 use schema 1.x. They were taken from blog homepages without deduplication and without publish dates, and many describe the same photos repeatedly. They remain unchanged in `data/` and are reported separately in the overview.
 
+**Model change.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. Later records are extracted by `gemini-3.5-flash-lite` (thinking level `LOW`; the model ignores custom temperatures). The fields `model` and `extraction_hash` separate the records of the two models.
+
 ## Data and State Files
 
 | Path | Content |
@@ -235,7 +237,7 @@ Manual runs (`workflow_dispatch`) accept a `mode`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | none | API key for Gemini (required) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Model for extraction and discovery; stored in every record |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model for extraction and discovery; stored in every record. A Gemini 3 or later model: the requests set a thinking level, which Gemini 2.5 models reject |
 | `MAX_POSTS_PER_RUN` | 40 | Posts per pipeline run |
 | `MAX_POSTS_PER_SOURCE` | 3 | Posts per source and run |
 | `MAX_PROBATION_POSTS_PER_RUN` | 10 | Posts from sources on probation per run |
