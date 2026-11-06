@@ -65,8 +65,8 @@ LOOKUP_REPEAT_DAYS = 180
 CANDIDATES_PER_RUN = 15
 MAX_ADMISSIONS_PER_WEEK = 10
 RECHECK_WORKERS = 8
-# Google recommends MEDIUM or higher for requests with tools; MINIMAL, the default of gemini-3.5-flash-lite, can end
-# the searches early. At most 12 requests per week; the thinking tokens cost well under one US dollar per month.
+# Google recommends MEDIUM or higher for requests with tools; lower levels can end the searches early. Set explicitly,
+# so that the default level of the configured model does not matter. At most 12 requests per week.
 SEARCH_THINKING_LEVEL = types.ThinkingLevel.MEDIUM
 # The focus changes every ISO week, to widen the sample beyond the US-centric legacy sources
 SEARCH_FOCUS = (
