@@ -19,7 +19,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from content import PostContent, extract_post_content, is_republished
+from content import PostContent, extract_post_content, is_republished, without_old_uploads
 from crawl import FetchedPage, PageFetchError
 from extraction import (
     FatalRequestError,
@@ -30,7 +30,17 @@ from extraction import (
     UnusableResponseError,
     extraction_hash,
 )
-from feeds import FeedError, Fetcher, ParsedFeed, SelectedPost, SourceFeed, fetch_feed, http_get, select_posts
+from feeds import (
+    FeedError,
+    Fetcher,
+    ParsedFeed,
+    SelectedPost,
+    SourceFeed,
+    count_due_posts,
+    fetch_feed,
+    http_get,
+    select_posts,
+)
 from images import ByteFetcher, ImageSelection, fetch_image_bytes, select_images
 from records import PostMetadata, SourceMetadata, build_records, is_excluded
 from schema import ImageRef
@@ -73,6 +83,8 @@ class RunStats:
         feeds_ok (int): Feeds fetched successfully.
         feeds_failed (int): Feeds that could not be fetched.
         posts_selected (int): Posts selected for the run.
+        posts_due (int): Posts that were due before the selection caps applied.
+        sources_with_due_posts (int): Sources with at least one due post.
         posts (Counter): Posts by outcome.
         images (Counter): Image candidates by filter result; ``selected`` for images sent to the model.
         model_rejections (Counter): Images the model did not assign to an outfit, by reason.
@@ -88,6 +100,8 @@ class RunStats:
     feeds_ok: int = 0
     feeds_failed: int = 0
     posts_selected: int = 0
+    posts_due: int = 0
+    sources_with_due_posts: int = 0
     posts: Counter = field(default_factory=Counter)
     images: Counter = field(default_factory=Counter)
     model_rejections: Counter = field(default_factory=Counter)
@@ -153,7 +167,10 @@ class DailyRun:
         feeds = self._refresh_feeds(sources)
         posts = select_posts(feeds, self.state, self.settings, self.today)
         self.stats.posts_selected = len(posts)
-        logger.info("%d posts selected from %d feeds.", len(posts), len(feeds))
+        self.stats.posts_due, self.stats.sources_with_due_posts = count_due_posts(
+            feeds, self.state, self.settings, self.today)
+        logger.info("%d posts selected from %d feeds; %d posts of %d sources were due.", len(posts), len(feeds),
+                    self.stats.posts_due, self.stats.sources_with_due_posts)
         for number, post in enumerate(posts, start=1):
             logger.info("Post %d/%d: %s", number, len(posts), post.url)
             try:
@@ -266,12 +283,23 @@ class DailyRun:
             self._complete(post, "done", content, outcome="duplicate")
             return
         report["candidates"] = len(content.images)
-        if is_republished(content.images, post.published):
+        # Old images would be dated wrongly, also when only some of the images are old
+        candidates = without_old_uploads(content.images, post.published)
+        if content.whole_page:
+            # Without an article element, old header and sidebar images would make most posts look republished.
+            # Such a post counts as republished only if no other image remains.
+            republished = bool(content.images) and not candidates
+        else:
+            republished = is_republished(content.images, post.published)
+        if republished:
             report["outcome"] = "republished"
             self._complete(post, "republished", content, outcome="republished")
             return
+        if len(candidates) < len(content.images):
+            report["old_uploads"] = len(content.images) - len(candidates)
+            self.stats.images["old upload"] += len(content.images) - len(candidates)
         selection = await asyncio.to_thread(
-            select_images, content.images, self.state.find_similar_image, self.settings.max_images_per_post,
+            select_images, candidates, self.state.find_similar_image, self.settings.max_images_per_post,
             post.url, self.services.fetch_image,
         )
         self.stats.images.update(selection.rejected)

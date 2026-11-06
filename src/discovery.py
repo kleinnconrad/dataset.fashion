@@ -65,8 +65,8 @@ LOOKUP_REPEAT_DAYS = 180
 CANDIDATES_PER_RUN = 15
 MAX_ADMISSIONS_PER_WEEK = 10
 RECHECK_WORKERS = 8
-# Google recommends MEDIUM or higher for requests with tools; MINIMAL, the default of gemini-3.5-flash-lite, can end
-# the searches early. At most 12 requests per week; the thinking tokens cost well under one US dollar per month.
+# Google recommends MEDIUM or higher for requests with tools; lower levels can end the searches early. Set explicitly,
+# so that the default level of the configured model does not matter. At most 12 requests per week.
 SEARCH_THINKING_LEVEL = types.ThinkingLevel.MEDIUM
 # The focus changes every ISO week, to widen the sample beyond the US-centric legacy sources
 SEARCH_FOCUS = (
@@ -467,12 +467,12 @@ def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: F
             update.update(country=country, country_basis="model", country_lookup=today)
         if language:
             update["language"] = language
-        entry = entry.model_copy(update=update)
-        if not registry.admit(entry):
+        stored = registry.admit(entry.model_copy(update=update))
+        if stored is None:
             summary["registry full"] += 1
             break
-        summary[entry.status] += 1
-        if entry.status in ADMITTED_STATUSES:
+        summary[stored.status] += 1
+        if stored.status in ADMITTED_STATUSES:
             admitted += 1
     return summary
 

@@ -1,7 +1,7 @@
 # Fashion Analytics Scraper
 [![CI](https://github.com/kleinnconrad/dataset.fashion/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kleinnconrad/dataset.fashion/actions/workflows/ci.yml)
 
-A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-3.5-flash-lite`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
+A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in GitHub Actions. It reads the RSS feeds of personal style blogs, renders new posts with `crawl4ai`, describes the outfits in their photos with Google Gemini (`gemini-3.8-flash`) and stores one record per outfit in this repository. A weekly job finds new blogs and maintains the list of sources without manual curation.
 
 ## Table of Contents
 - [Dataset Overview](#dataset-overview)
@@ -167,9 +167,9 @@ sequenceDiagram
 
 - **Registry.** The blogs are listed in `data/state/sources.json`. Nothing is curated by hand: the registry is seeded once from the domains of the legacy records, extended weekly by discovery, and maintained by fixed rules (see [Source Lifecycle](#source-lifecycle)).
 - **Feeds.** Each run fetches the RSS or Atom feeds of the active sources and of the sources on probation. Posts published within the last 30 days that have not been processed yet are candidates. Posts whose title or tags indicate other topics (books, recipes, podcasts, interiors, giveaways, skincare, gift guides) are skipped.
-- **Selection.** At most 3 posts per source and 40 posts per run, of which at most 10 come from sources on probation. The sources take turns, oldest posts first.
-- **Content.** If the feed contains the full post with images, it is used directly; otherwise `crawl4ai` renders the post page. The article element is selected from the page, so that header, sidebar, related posts, share buttons and shop widgets are left out.
-- **Republished posts.** Posts whose images were uploaded more than 12 months before the publish date (WordPress upload paths) are skipped, because their outfits would be dated wrongly.
+- **Selection.** At most 3 posts per source and 40 posts per run, of which at most 10 come from sources on probation. The sources take turns, oldest posts first. A post that appears in the feeds of two sources is selected once.
+- **Content.** If the feed contains the full post with images, it is used directly; otherwise `crawl4ai` renders the post page. The article element is selected from the page, so that header, sidebar, related posts, share buttons and shop widgets are left out. Generic selectors are tried first, then the post containers of the Showit and Elementor site builders; if none matches, the whole page is used.
+- **Old images and republished posts.** Images uploaded more than 12 months before the publish date (WordPress upload paths) are not analyzed, because their outfits would be dated wrongly. If most dated images of an article are that old, the post is skipped as republished. If the whole page had to be used, old header and sidebar images are common, so such a post is skipped only if no other image remains.
 - **Images.** At most 15 candidates per post are downloaded. The pipeline corrects the EXIF orientation, discards images with a shorter side below 400 px or a banner shape, and removes duplicates with a perceptual hash (dHash), within the post and against all images analyzed before. At most 8 images go to the model.
 - **Extraction.** One Gemini request per post contains all images and the post text. The model groups the images that show the same person in the same outfit and returns one outfit per person and outfit; images without an outfit are listed with a reason. Brand names are kept only if they appear in the post's text, captions or link texts. Outfits of children and teenagers are not stored.
 
@@ -185,6 +185,7 @@ sequenceDiagram
 | To `dormant` | No post for more than 90 days. |
 | Back from `dormant` | At least 2 posts in the last 60 days, checked weekly. The source returns to its previous status. |
 | To `broken` | The feed failed on 7 consecutive pipeline runs (about three and a half weeks). It is checked weekly and returns to its previous status when the feed works again. |
+| Same feed | A source whose feed is the feed of another source, for example a second domain of the same blog, is `rejected`, at admission and after every run. Of the sources already in the registry, the one on the feed's own domain is kept. |
 
 Further rules:
 - Known domains are never proposed again, so `rejected` and `retired` sources stay out.
@@ -202,7 +203,7 @@ Each record describes one outfit of one person in one post. The models are defin
 
 **Legacy records.** The records collected before the switch to schema 2.0 use schema 1.x. They were taken from blog homepages without deduplication and without publish dates, and many describe the same photos repeatedly. They remain unchanged in `data/` and are reported separately in the overview.
 
-**Model change.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. Later records are extracted by `gemini-3.5-flash-lite` (thinking level `LOW`; the model ignores custom temperatures). The fields `model` and `extraction_hash` separate the records of the two models.
+**Model changes.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. The records of 2026-11-06 were extracted by `gemini-3.5-flash-lite`, which was replaced after this one run. Later records are extracted by `gemini-3.8-flash` (thinking level `LOW`; Gemini 3 and later models ignore custom temperatures). The fields `model` and `extraction_hash` separate the records of the three models.
 
 ## Data and State Files
 
@@ -212,7 +213,7 @@ Each record describes one outfit of one person in one post. The models are defin
 | `data/state/sources.json` | Source registry |
 | `data/state/posts.json` | Processed posts with status and attempts |
 | `data/state/images.json` | dHashes of all analyzed images |
-| `data/state/run_log.jsonl` | One line per pipeline run or weekly maintenance run, with counters and token usage |
+| `data/state/run_log.jsonl` | One line per pipeline run or weekly maintenance run, with counters and token usage. Pipeline runs also record the posts that were due before the selection caps (`posts_due`, `sources_with_due_posts`). |
 
 The state files have a version key and one entry per line, and they are written atomically after every post.
 
@@ -237,7 +238,7 @@ Manual runs (`workflow_dispatch`) accept a `mode`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | none | API key for Gemini (required) |
-| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model for extraction and discovery; stored in every record. A Gemini 3 or later model: the requests set a thinking level, which Gemini 2.5 models reject |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Model for extraction and discovery; stored in every record. A Gemini 3 or later model: the requests set a thinking level, which Gemini 2.5 models reject |
 | `MAX_POSTS_PER_RUN` | 40 | Posts per pipeline run |
 | `MAX_POSTS_PER_SOURCE` | 3 | Posts per source and run |
 | `MAX_PROBATION_POSTS_PER_RUN` | 10 | Posts from sources on probation per run |

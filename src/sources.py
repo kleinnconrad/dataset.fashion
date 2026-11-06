@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from feeds import BLOCKED_STATUSES, Fetcher, ParsedFeed, count_recent_posts, find_feed, http_get
 from schema import CountryBasis
 from state import atomic_write_text, dump_entries, load_entries
-from urls import domain_id
+from urls import domain_id, normalize_url
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +182,43 @@ def apply_rules(source: SourceEntry, today: date) -> SourceEntry:
     return source
 
 
+def feed_key(feed_url: Optional[str]) -> Optional[str]:
+    """Returns a comparison key for a feed URL.
+
+    Args:
+        feed_url: URL of the feed.
+
+    Returns:
+        Optional[str]: The normalized URL, or None if there is no valid URL.
+    """
+    if not feed_url:
+        return None
+    try:
+        return normalize_url(feed_url)
+    except ValueError:
+        return None
+
+
+def _shared_feed_preference(source: SourceEntry) -> tuple[bool, bool, int, date, str]:
+    """Sort key that puts first the source to keep among sources with the same feed.
+
+    The source on the feed's own domain comes first, then admitted sources,
+    then the source with more processed posts, then the older one.
+
+    Args:
+        source: A source with a feed URL.
+
+    Returns:
+        tuple: The sort key.
+    """
+    try:
+        own_domain = domain_id(source.feed_url or "") == source.source_id
+    except ValueError:
+        own_domain = False
+    return (not own_domain, source.status not in ADMITTED_STATUSES, -source.posts_processed, source.added,
+            source.source_id)
+
+
 def record_post_outcome(source: SourceEntry, produced_outfit: bool) -> SourceEntry:
     """Adds the outcome of a processed post to the statistics of its source.
 
@@ -338,23 +375,81 @@ class SourceRegistry:
         """Number of active and probation sources."""
         return sum(1 for entry in self._entries.values() if entry.status in ADMITTED_STATUSES)
 
-    def admit(self, entry: SourceEntry) -> bool:
+    def source_with_feed(self, feed_url: Optional[str], exclude: str) -> Optional[SourceEntry]:
+        """Returns another known source that reads the same feed.
+
+        Args:
+            feed_url: URL of the feed.
+            exclude: Domain of the source to leave out of the comparison.
+
+        Returns:
+            Optional[SourceEntry]: The first such source by domain, or None.
+        """
+        key = feed_key(feed_url)
+        if key is None:
+            return None
+        for source_id in sorted(self._entries):
+            if source_id != exclude and feed_key(self._entries[source_id].feed_url) == key:
+                return self._entries[source_id]
+        return None
+
+    def admit(self, entry: SourceEntry) -> Optional[SourceEntry]:
         """Adds a newly evaluated source, respecting MAX_ADMITTED_SOURCES.
+
+        A source whose feed is already the feed of a known source, for example
+        a second domain of the same blog, is stored as ``rejected``. The
+        entry's ``added`` date is used as the date of that decision.
 
         Args:
             entry: The evaluated source.
 
         Returns:
-            bool: False if the source would be admitted but the registry is full;
-            it is then not stored, so that it can be proposed again later.
+            Optional[SourceEntry]: The stored entry, or None if the source would
+            be admitted but the registry is full; it is then not stored, so that
+            it can be proposed again later.
         """
+        if entry.status not in TERMINAL_STATUSES:
+            known = self.source_with_feed(entry.feed_url, exclude=entry.source_id)
+            if known is not None:
+                entry = _transition(entry, "rejected", entry.added, f"same feed as {known.source_id}")
         if entry.status in ADMITTED_STATUSES and self.admitted_count() >= MAX_ADMITTED_SOURCES:
-            return False
+            return None
         self.put(entry)
-        return True
+        return entry
+
+    def reject_shared_feeds(self, today: date) -> list[tuple[str, str, str]]:
+        """Keeps one source per feed among the sources that are not rejected or retired.
+
+        A feed can be reached from two domains, or a feed redirect can point
+        two sources at the same feed. Both would then select the same posts.
+        The source on the feed's own domain is kept (see
+        ``_shared_feed_preference``); the others are rejected.
+
+        Args:
+            today: Date of the run.
+
+        Returns:
+            list: ``(source_id, old status, "rejected")`` for every change.
+        """
+        by_feed: dict[str, list[SourceEntry]] = {}
+        for entry in self._entries.values():
+            key = feed_key(entry.feed_url)
+            if key is not None and entry.status not in TERMINAL_STATUSES:
+                by_feed.setdefault(key, []).append(entry)
+        changes = []
+        for group in by_feed.values():
+            if len(group) < 2:
+                continue
+            keeper, *duplicates = sorted(group, key=_shared_feed_preference)
+            for duplicate in duplicates:
+                updated = _transition(duplicate, "rejected", today, f"same feed as {keeper.source_id}")
+                self._entries[duplicate.source_id] = updated
+                changes.append((duplicate.source_id, duplicate.status, updated.status))
+                logger.info("Source %s: %s -> rejected (%s).", duplicate.source_id, duplicate.status, updated.note)
+        return changes
 
     def apply_rules(self, today: date) -> list[tuple[str, str, str]]:
-        """Applies the lifecycle rules to all sources.
+        """Applies the lifecycle rules to all sources, then keeps one source per feed.
 
         Args:
             today: Date of the run.
@@ -369,7 +464,7 @@ class SourceRegistry:
                 changes.append((source_id, entry.status, updated.status))
                 logger.info("Source %s: %s -> %s (%s).", source_id, entry.status, updated.status, updated.note)
             self._entries[source_id] = updated
-        return changes
+        return changes + self.reject_shared_feeds(today)
 
 
 @dataclass(frozen=True)
@@ -444,8 +539,9 @@ def seed_from_legacy(
             lambda item: evaluate_candidate(item[1].homepage, "legacy", today, fetch, item[1].records), ordered))
     summary: Counter = Counter()
     for entry in entries:
-        if registry.admit(entry):
-            summary[entry.status] += 1
+        stored = registry.admit(entry)
+        if stored is not None:
+            summary[stored.status] += 1
         else:
             summary["not admitted (full)"] += 1
     logger.info("Seeding result: %s", dict(summary))

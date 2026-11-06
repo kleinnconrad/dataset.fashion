@@ -8,6 +8,7 @@ from generate_dataset_overview import END_MARKER, START_MARKER, build_overview, 
 from records import PostMetadata, SourceMetadata, build_records
 from schema import ImageRef, PostExtraction
 from sources import SourceEntry, SourceRegistry
+from state import PipelineState
 from storage import append_records
 
 FIXTURE = Path(__file__).parent / "fixtures" / "post_extraction.json"
@@ -43,7 +44,12 @@ def make_dataset(data_dir: Path) -> None:
                                  country="US", posts_processed=2, posts_with_outfits=2,
                                  last_post_date=date(2026, 10, 8)))
     registry.save()
-    (data_dir / "state" / "posts.json").write_text('{"version": 1, "posts": {}}', encoding="utf-8")
+    state = PipelineState(data_dir / "state", {}, {})
+    for slug, status in (("look-one", "done"), ("look-two", "done"), ("old-look", "republished")):
+        state.register(f"https://example.com/{slug}", source_id="example.com", url=f"https://example.com/{slug}/",
+                       title=slug, published=date(2026, 10, 8), tags=(), today=date(2026, 10, 10))
+        state.complete(f"https://example.com/{slug}", status, today=date(2026, 10, 10))
+    state.save()
 
 
 def test_overview_summarizes_both_schemas_and_the_registry(tmp_path: Path) -> None:
@@ -54,7 +60,7 @@ def test_overview_summarizes_both_schemas_and_the_registry(tmp_path: Path) -> No
     assert "**Images reused across posts:** 1" in overview
     assert "**Legacy records (schema 1.x):** 2 records in 1 files (2026-06-14 to 2026-06-14)" in overview
     assert "**Sources:** 1 active, 0 probation, 1 dormant, 0 broken, 0 rejected, 0 retired" in overview
-    assert "| example.com | US | 2 | 100.0% (2) | 2026-10-08 |" in overview
+    assert "| example.com | US | 2 | 100.0% (2) | 1 | 2026-10-08 |" in overview
     assert "| `framing` | Widest view of the person among the images of this outfit. | 100.0% (4) | 1 |" in overview
     assert "| `garments` |" not in overview
     assert "| Outerwear | 2 | 50.0% (2) |" in overview

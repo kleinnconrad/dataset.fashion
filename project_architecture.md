@@ -42,16 +42,16 @@ dataset.fashion/
 
 1. Load the source registry. If it is empty, seed it from the domains of the legacy records.
 2. Fetch the feeds of the active and probation sources and update their feed statistics.
-3. Select the posts: published within 30 days, not yet processed or due for a retry, not about clearly unrelated topics; at most 3 per source, 40 per run and 10 from sources on probation.
+3. Select the posts: published within 30 days, not yet processed or due for a retry, not about clearly unrelated topics; at most 3 per source, 40 per run and 10 from sources on probation; a post in the feeds of two sources once.
 4. For each post:
    1. Take the content from the feed if it includes images, else render the page with crawl4ai.
    2. Select the article element and extract text, image candidates, links and the canonical URL.
-   3. Skip the post if it was already processed under its canonical URL, or if it is republished.
+   3. Skip the post if it was already processed under its canonical URL, or if it is republished. Leave out images that were uploaded more than 12 months before the publish date.
    4. Download the image candidates, filter them by size and shape, and remove duplicates by dHash.
    5. Send all images and the post text to Gemini in one request.
    6. Build the records, without outfits of minors, and merge them into the day file.
    7. Save the post state, the image state and the source registry.
-5. Give up pending posts older than 30 days, apply the source lifecycle rules, save, and append a line to the run log.
+5. Give up pending posts older than 30 days, apply the source lifecycle rules (including one source per feed), save, and append a line to the run log.
 6. The workflow updates the README overview and commits `data/` and `README.md`.
 
 ---

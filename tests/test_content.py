@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from content import ImageCandidate, extract_post_content, is_republished
+from content import ImageCandidate, extract_post_content, is_old_upload, is_republished, without_old_uploads
 
 PAGES_DIR = Path(__file__).parent / "fixtures" / "pages"
 UPLOADS = "https://www.example-style.com/wp-content/uploads/2026/10/"
@@ -67,7 +67,7 @@ def test_blogger_uses_the_linked_full_size_images() -> None:
 def test_without_article_element_the_body_is_used() -> None:
     content = extract_post_content("<html><body><p>Short</p><img src='/look.jpg'></body></html>",
                                    "https://example.com/post/")
-    assert content.matched_selector is None
+    assert content.matched_selector is None and content.whole_page
     assert [image.url for image in content.images] == ["https://example.com/look.jpg"]
 
 
@@ -88,7 +88,7 @@ def test_the_largest_article_element_wins() -> None:
 def test_feed_fragment_is_used_as_the_article() -> None:
     fragment = "<p>Coat by Boden.</p><img src='https://example.com/wp-content/uploads/2026/10/coat.jpg' alt='Coat'>"
     content = extract_post_content(fragment, "https://example.com/post/", fragment=True)
-    assert content.matched_selector is None
+    assert content.matched_selector is None and not content.whole_page
     assert content.images[0].alt == "Coat"
 
 
@@ -112,3 +112,34 @@ def image_from(month: date) -> ImageCandidate:
 )
 def test_is_republished(months: list, published: date, expected: bool) -> None:
     assert is_republished([image_from(month) for month in months], published) is expected
+
+
+SIDEBAR = ("<div class='sidebar'><img src='https://example.com/wp-content/uploads/2024/08/about-me.jpg'>"
+           "<img src='https://example.com/wp-content/uploads/2024/09/stock-photo.jpg'></div>")
+
+
+@pytest.mark.parametrize(
+    ("container", "selector"),
+    [
+        ("<div id='post-content(1)' class='sb sib-post-content'><div class='se-wpt'>{post}</div></div>",
+         ".sib-post-content"),
+        ("<div class='elementor elementor-location-single post-1'><div class='elementor-widget-container'>{post}"
+         "</div></div>", ".elementor-location-single"),
+    ],
+)
+def test_site_builder_post_containers(container: str, selector: str) -> None:
+    post = ("<p>" + "Outfit details. " * 20 + "</p>"
+            "<img src='https://example.com/wp-content/uploads/2026/10/look.png'>")
+    html = f"<html><body><div class='header'></div>{container.format(post=post)}{SIDEBAR}</body></html>"
+    content = extract_post_content(html, "https://example.com/2026/10/28/look.html")
+    assert (content.matched_selector, content.whole_page) == (selector, False)
+    assert [image.url for image in content.images] == ["https://example.com/wp-content/uploads/2026/10/look.png"]
+
+
+def test_without_old_uploads_keeps_new_and_undated_images() -> None:
+    old, new = image_from(date(2024, 8, 1)), image_from(date(2026, 10, 1))
+    undated = ImageCandidate(url="https://static.example/logo.jpg")
+    assert is_old_upload(old, date(2026, 10, 28)) and not is_old_upload(new, date(2026, 10, 28))
+    assert not is_old_upload(old, None)
+    assert without_old_uploads([old, new, undated, old], date(2026, 10, 28)) == (new, undated)
+    assert without_old_uploads([old], None) == (old,)

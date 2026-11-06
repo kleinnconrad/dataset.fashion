@@ -182,6 +182,39 @@ def test_admission_respects_the_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert "c.example" not in registry and "d.example" in registry
 
 
+def test_second_source_with_the_same_feed_is_not_admitted(tmp_path: Path) -> None:
+    registry = SourceRegistry.load(tmp_path)
+    registry.admit(source("active", source_id="blog.example", feed_url="https://blog.example/feed/"))
+    stored = registry.admit(source("probation", source_id="old-name.example", feed_url="https://www.blog.example/feed",
+                                   added=TODAY))
+    assert (stored.status, stored.note, stored.status_since) == ("rejected", "same feed as blog.example", TODAY)
+    assert registry.get("old-name.example").status == "rejected"
+
+
+def test_one_source_per_feed_is_kept(tmp_path: Path) -> None:
+    registry = SourceRegistry.load(tmp_path)
+    feed = "https://blog.example/feed"
+    # The other domain was admitted first and processed more posts; the feed's own domain is kept all the same
+    registry.put(source("active", source_id="other-domain.example", feed_url=feed, posts_processed=9,
+                        added=TODAY - timedelta(days=90)))
+    registry.put(source("active", source_id="blog.example", feed_url=feed + "/", posts_processed=6))
+    registry.put(source("retired", source_id="retired.example", feed_url=feed))
+    registry.put(source("active", source_id="unrelated.example", feed_url="https://unrelated.example/feed/"))
+    changes = registry.apply_rules(TODAY)
+    assert changes == [("other-domain.example", "active", "rejected")]
+    assert registry.get("other-domain.example").note == "same feed as blog.example"
+    assert {entry.source_id for entry in registry.with_status("active")} == {"blog.example", "unrelated.example"}
+
+
+def test_shared_feed_on_a_third_domain_keeps_the_admitted_source(tmp_path: Path) -> None:
+    registry = SourceRegistry.load(tmp_path)
+    feed = "https://feeds.host.example/blog"
+    registry.put(source("dormant", source_id="a.example", feed_url=feed, previous_status="active",
+                        posts_last_60_days=0))
+    registry.put(source("probation", source_id="b.example", feed_url=feed))
+    assert registry.reject_shared_feeds(TODAY) == [("a.example", "dormant", "rejected")]
+
+
 def write_legacy(data_dir: Path, name: str, urls: list[str]) -> None:
     """Writes a legacy records file with one record per URL."""
     path = data_dir / "2026" / "07" / name
