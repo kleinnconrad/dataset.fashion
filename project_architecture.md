@@ -62,7 +62,7 @@ dataset.fashion/
 
 1. Fetch the feeds of dormant and broken sources and apply the lifecycle rules, so that sources that publish again return.
 2. Ask Gemini with Google Search for the country and language of sources whose country was so far inferred only from the domain or the feed language (20 domains per request).
-3. Ask Gemini with Google Search for new personal style blogs, with a search focus that changes every week. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week.
+3. Ask Gemini with Google Search for new personal style blogs, in up to 4 searches with successive focuses, starting with the focus of the week. A search without results does not end the discovery. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week, and the searches end once that number is reached.
 
 The workflow commits `data/state/`.
 

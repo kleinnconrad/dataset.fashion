@@ -213,7 +213,7 @@ Each record describes one outfit of one person in one post. The models are defin
 | `data/state/sources.json` | Source registry |
 | `data/state/posts.json` | Processed posts with status and attempts |
 | `data/state/images.json` | dHashes of all analyzed images |
-| `data/state/run_log.jsonl` | One line per pipeline run or weekly maintenance run, with counters and token usage. Pipeline runs also record the posts that were due before the selection caps (`posts_due`, `sources_with_due_posts`). |
+| `data/state/run_log.jsonl` | One line per pipeline run or weekly maintenance run, with counters and token usage. Pipeline runs also record the posts that were due before the selection caps (`posts_due`, `sources_with_due_posts`); maintenance runs record each discovery search with its focus, candidates and admitted sources, and the beginning of the answer if it named no blog (`searches`). |
 
 The state files have a version key and one entry per line, and they are written atomically after every post.
 

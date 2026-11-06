@@ -31,7 +31,7 @@ This directory contains the modules of the pipeline. The modules import each oth
 Starts a pipeline run. Options: `--dry-run` (no model calls, writes a report), `--max-posts`, `--source` and `--output-dir`. Exits with code 1 if Gemini rejects requests and with code 2 if the API key is missing.
 
 ### `discovery.py`
-Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs. Option: `--output-dir`.
+Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs in several searches with successive focuses. Option: `--output-dir`.
 
 ### `generate_dataset_overview.py`
 Writes the overview between the markers in the repository's `README.md`: summary, source registry with the posts skipped as republished per source, field table with the descriptions from `schema.py`, garment table and a check for images that appear in more than one post.
