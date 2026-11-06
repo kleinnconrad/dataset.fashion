@@ -8,6 +8,7 @@ from feeds import (
     FeedError,
     FeedPost,
     SourceFeed,
+    count_due_posts,
     count_recent_posts,
     fetch_feed,
     find_feed,
@@ -203,3 +204,24 @@ def test_probation_sources_have_a_quota(tmp_path: Path) -> None:
     ]
     selected = select_posts(feeds, state, settings(max_probation_posts_per_run=1), TODAY)
     assert [post.source_id for post in selected] == ["old.example", "new2.example"]
+
+
+def test_posts_of_a_shared_feed_are_selected_once(tmp_path: Path) -> None:
+    state = PipelineState(tmp_path, {}, {})
+    shared = posts_for("blog.example", [1, 2])
+    feeds = [SourceFeed("blog.example", False, shared), SourceFeed("other-domain.example", False, shared),
+             SourceFeed("c.example", False, posts_for("c.example", [3]))]
+    selected = select_posts(feeds, state, settings(), TODAY)
+    assert [post.title for post in selected] == ["c.example 3", "blog.example 2", "blog.example 1"]
+    assert [post.source_id for post in selected] == ["c.example", "blog.example", "blog.example"]
+
+
+def test_count_due_posts_ignores_the_caps(tmp_path: Path) -> None:
+    state = PipelineState(tmp_path, {}, {})
+    shared = posts_for("blog.example", [1, 2, 3, 4])
+    feeds = [SourceFeed("blog.example", False, shared), SourceFeed("other-domain.example", False, shared),
+             SourceFeed("c.example", False, posts_for("c.example", [3, 45])), SourceFeed("d.example", False, ())]
+    capped = settings(max_posts_per_source=1, max_posts_per_run=2)
+    assert len(select_posts(feeds, state, capped, TODAY)) == 2
+    # Four shared posts are counted once; the post from 45 days ago is outside the lookback period
+    assert count_due_posts(feeds, state, capped, TODAY) == (5, 3)

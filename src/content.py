@@ -20,9 +20,11 @@ from extraction import MAX_TEXT_CHARS
 from urls import domain_id
 
 # Tried one at a time, in this order, because a comma-separated selector would
-# return the first match in page order instead of the first selector that matches
+# return the first match in page order instead of the first selector that matches. The last two are the post
+# containers of the Showit and Elementor site builders, whose pages have none of the generic elements; they come last
+# so that pages that match a generic selector are not affected.
 ARTICLE_SELECTORS = (".entry-content", ".post-content", ".post-body", ".post-entry", ".full-post", ".entry", "article",
-                     "main")
+                     "main", ".sib-post-content", ".elementor-location-single")
 MIN_ARTICLE_TEXT_CHARS = 200
 # Elements inside the article that hold navigation, sharing buttons, comments or related posts
 NOISE_SELECTORS = ("script", "style", "template", "form", "nav", "aside", "iframe", "[class*=related]",
@@ -97,6 +99,9 @@ class PostContent:
         canonical_url (Optional[str]): Canonical URL declared by the page.
         matched_selector (Optional[str]): Selector of the article element, or
             None if the whole document was used.
+        whole_page (bool): Whether no article element was found on a page, so
+            that the images include the header, sidebar and footer. False for
+            the content of a feed, which is the article itself.
     """
     text: str
     images: tuple[ImageCandidate, ...]
@@ -104,6 +109,7 @@ class PostContent:
     shopping_link_count: int
     canonical_url: Optional[str]
     matched_selector: Optional[str]
+    whole_page: bool = False
 
 
 def _collapse(text: Optional[str]) -> Optional[str]:
@@ -325,7 +331,26 @@ def extract_post_content(html: str, page_url: str, fragment: bool = False) -> Po
         shopping_link_count=shopping_link_count,
         canonical_url=canonical_url,
         matched_selector=selector,
+        whole_page=not fragment and selector is None,
     )
+
+
+def is_old_upload(image: ImageCandidate, published: Optional[date]) -> bool:
+    """Returns True if an image was uploaded long before the post's publish date.
+
+    Args:
+        image: An image candidate.
+        published: Publish date from the feed.
+
+    Returns:
+        bool: True if the WordPress upload path of the image is more than
+        REPUBLISHED_AFTER_MONTHS months older than the publish date; False if
+        either date is unknown.
+    """
+    month = image.upload_month
+    if published is None or month is None:
+        return False
+    return (published.year * 12 + published.month) - (month.year * 12 + month.month) > REPUBLISHED_AFTER_MONTHS
 
 
 def is_republished(images: Sequence[ImageCandidate], published: Optional[date]) -> bool:
@@ -342,9 +367,24 @@ def is_republished(images: Sequence[ImageCandidate], published: Optional[date]) 
         bool: True if more than half of the dated images are more than
         REPUBLISHED_AFTER_MONTHS months older than the publish date.
     """
-    months = [image.upload_month for image in images if image.upload_month is not None]
-    if published is None or not months:
+    dated = [image for image in images if image.upload_month is not None]
+    if published is None or not dated:
         return False
-    published_index = published.year * 12 + published.month
-    old = sum(1 for month in months if published_index - (month.year * 12 + month.month) > REPUBLISHED_AFTER_MONTHS)
-    return old * 2 > len(months)
+    old = sum(1 for image in dated if is_old_upload(image, published))
+    return old * 2 > len(dated)
+
+
+def without_old_uploads(images: Sequence[ImageCandidate], published: Optional[date]) -> tuple[ImageCandidate, ...]:
+    """Leaves out the images that were uploaded long before the post's publish date.
+
+    Such images would place old outfits at a new date. On a page without an
+    article element they are also often header, sidebar or footer images.
+
+    Args:
+        images: The image candidates of the post.
+        published: Publish date from the feed.
+
+    Returns:
+        tuple[ImageCandidate, ...]: The other images, in their original order.
+    """
+    return tuple(image for image in images if not is_old_upload(image, published))

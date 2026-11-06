@@ -37,27 +37,36 @@ def image_urls(post_url: str, upload_path: str = "2026/10") -> list[str]:
     return [f"https://{BLOG}/wp-content/uploads/{upload_path}/{slug}-{n}.jpg" for n in (1, 2)]
 
 
-def page_html(post_url: str, upload_path: str = "2026/10") -> str:
-    """Builds a post page with two outfit photos."""
+# Old sidebar images of a page without an article element
+SIDEBAR_IMAGES = [f"https://{BLOG}/wp-content/uploads/2015/12/sidebar-{n}.jpg" for n in (1, 2, 3)]
+
+
+def page_html(post_url: str, upload_path: str = "2026/10", whole_page: bool = False) -> str:
+    """Builds a post page with two outfit photos; with ``whole_page``, without an article element and with a sidebar."""
     figures = "".join(f"<figure><img src='{url}' alt='Look'><figcaption>Coat by Everlane</figcaption></figure>"
                       for url in image_urls(post_url, upload_path))
-    return (f"<html><head><link rel='canonical' href='{post_url}'></head><body><div class='entry-content'>"
-            f"<p>{'Outfit details. ' * 20}</p>{figures}</div></body></html>")
+    head = f"<html><head><link rel='canonical' href='{post_url}'></head><body>"
+    if whole_page:
+        sidebar = "".join(f"<img src='{url}'>" for url in SIDEBAR_IMAGES)
+        return f"{head}<div class='sb'><p>{'Outfit details. ' * 20}</p>{figures}</div><div>{sidebar}</div></body></html>"
+    return f"{head}<div class='entry-content'><p>{'Outfit details. ' * 20}</p>{figures}</div></body></html>"
 
 
 class FakePages:
     """Serves post pages; prepared errors are raised instead."""
 
-    def __init__(self, upload_path: str = "2026/10", errors: Optional[dict[str, Exception]] = None) -> None:
+    def __init__(self, upload_path: str = "2026/10", errors: Optional[dict[str, Exception]] = None,
+                 whole_page: bool = False) -> None:
         self.upload_path = upload_path
         self.errors = errors or {}
+        self.whole_page = whole_page
         self.requested: list[str] = []
 
     async def __call__(self, url: str) -> FetchedPage:
         self.requested.append(url)
         if url in self.errors:
             raise self.errors[url]
-        return FetchedPage(url=url, status_code=200, html=page_html(url, self.upload_path))
+        return FetchedPage(url=url, status_code=200, html=page_html(url, self.upload_path, self.whole_page))
 
 
 class FakeExtractor:
@@ -131,8 +140,8 @@ def test_run_stores_records_state_and_log(setup: dict[str, Any]) -> None:
     assert {entry.status for entry in state.posts.values()} == {"done"}
     source = SourceRegistry.load(setup["settings"].state_dir).get(BLOG)
     assert (source.posts_processed, source.posts_with_outfits) == (2, 2)
-    log = (setup["settings"].state_dir / RUN_LOG_FILE).read_text(encoding="utf-8").splitlines()
-    assert json.loads(log[-1])["outfits"] == 2
+    log = json.loads((setup["settings"].state_dir / RUN_LOG_FILE).read_text(encoding="utf-8").splitlines()[-1])
+    assert (log["outfits"], log["posts_selected"], log["posts_due"], log["sources_with_due_posts"]) == (2, 2, 2, 1)
 
 
 def test_second_run_adds_nothing(setup: dict[str, Any]) -> None:
@@ -211,6 +220,38 @@ def test_republished_posts_are_skipped(setup: dict[str, Any]) -> None:
     stats = run(setup, extractor=extractor, pages=FakePages(upload_path="2015/12"))
     assert dict(stats.posts) == {"republished": 2} and extractor.usage.calls == 0
     assert SourceRegistry.load(setup["settings"].state_dir).get(BLOG).posts_processed == 0
+
+
+def test_old_images_of_a_whole_page_are_left_out(setup: dict[str, Any]) -> None:
+    add_source(setup["settings"])
+    stats = run(setup, pages=FakePages(whole_page=True))
+    # Three old sidebar images per page would have marked both posts as republished
+    assert dict(stats.posts) == {"done": 2}
+    assert (stats.images["old upload"], stats.images["selected"]) == (6, 4)
+    assert all(len(record["images"]) == 2 for record in stored(setup))
+
+
+def test_an_old_image_in_an_article_is_left_out(setup: dict[str, Any]) -> None:
+    add_source(setup["settings"])
+    old_image = f"https://{BLOG}/wp-content/uploads/2015/12/about-me.jpg"
+
+    class PagesWithOldImage(FakePages):
+        async def __call__(self, url: str) -> FetchedPage:
+            page = await super().__call__(url)
+            return FetchedPage(url=url, status_code=200,
+                               html=page.html.replace("</div></body>", f"<img src='{old_image}'></div></body>"))
+
+    stats = run(setup, pages=PagesWithOldImage())
+    # One old image of three does not make a post republished, but it is not analyzed
+    assert dict(stats.posts) == {"done": 2}
+    assert (stats.images["old upload"], stats.images["selected"]) == (2, 4)
+
+
+def test_whole_page_with_only_old_images_is_republished(setup: dict[str, Any]) -> None:
+    add_source(setup["settings"])
+    extractor = FakeExtractor()
+    stats = run(setup, extractor=extractor, pages=FakePages(upload_path="2015/12", whole_page=True))
+    assert dict(stats.posts) == {"republished": 2} and extractor.usage.calls == 0
 
 
 def test_outfits_of_minors_are_not_stored(setup: dict[str, Any]) -> None:

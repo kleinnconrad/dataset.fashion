@@ -12,10 +12,11 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from schema import GARMENT_TYPES_BY_CATEGORY, SCHEMA_VERSION, OutfitRecord
 from sources import SourceRegistry
+from state import PipelineState
 
 logger = logging.getLogger(__name__)
 
@@ -140,28 +141,46 @@ def garment_rows(records: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
-def source_rows(registry: SourceRegistry) -> list[str]:
+def republished_by_source(state: PipelineState) -> Counter:
+    """Counts the posts that were skipped as republished, by source.
+
+    Args:
+        state: The post state.
+
+    Returns:
+        Counter: Number of republished posts by domain.
+    """
+    return Counter(entry.source_id for entry in state.posts.values() if entry.status == "republished")
+
+
+def source_rows(registry: SourceRegistry, republished: Optional[Counter] = None) -> list[str]:
     """Builds the registry summary and the table of active sources.
 
     Args:
         registry: The source registry.
+        republished: Posts skipped as republished, by domain. A high count can
+            mean that the article element of a site is not found.
 
     Returns:
         list[str]: Markdown lines.
     """
+    republished = republished or Counter()
     counts = Counter(entry.status for entry in registry)
     summary = ", ".join(f"{counts[status]} {status}" for status in STATUS_ORDER)
     lines = [f"- **Sources:** {summary}" if len(registry) else "- **Sources:** none registered yet"]
     active = sorted(registry.with_status("active"), key=lambda e: (-e.posts_processed, e.source_id))
     if not active:
         return lines
-    lines.extend(["", "**Active sources** (posts processed since admission)", "",
-                  "| Source | Country | Posts | Posts with outfits | Last post |", "|---|---|---|---|---|"])
+    lines.extend(["", "**Active sources** (posts processed since admission; posts skipped as republished are not "
+                  "included in Posts)", "",
+                  "| Source | Country | Posts | Posts with outfits | Skipped as republished | Last post |",
+                  "|---|---|---|---|---|---|"])
     for entry in active[:MAX_SOURCE_ROWS]:
         lines.append(f"| {entry.source_id} | {entry.country or 'unknown'} | {entry.posts_processed} | "
-                     f"{_percent(entry.posts_with_outfits, entry.posts_processed)} | {entry.last_post_date or '-'} |")
+                     f"{_percent(entry.posts_with_outfits, entry.posts_processed)} | "
+                     f"{republished[entry.source_id]} | {entry.last_post_date or '-'} |")
     if len(active) > MAX_SOURCE_ROWS:
-        lines.append(f"| ... {len(active) - MAX_SOURCE_ROWS} more | | | | |")
+        lines.append(f"| ... {len(active) - MAX_SOURCE_ROWS} more | | | | | |")
     return lines
 
 
@@ -210,7 +229,8 @@ def build_overview(data_dir: Path, now: datetime) -> str:
         lines.append(f"- **Legacy records (schema 1.x):** {len(legacy):,} records in {len(legacy_dates)} files "
                      f"({min(legacy_dates)} to {max(legacy_dates)}); collected without deduplication and "
                      "without publish dates, and not included in the tables below")
-    lines.extend(source_rows(SourceRegistry.load(data_dir / "state")))
+    state_dir = data_dir / "state"
+    lines.extend(source_rows(SourceRegistry.load(state_dir), republished_by_source(PipelineState.load(state_dir))))
     if current:
         lines.extend(["", f"**Fields (schema {SCHEMA_VERSION})**", ""])
         lines.extend(field_rows(current))

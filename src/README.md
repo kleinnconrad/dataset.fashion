@@ -34,12 +34,12 @@ Starts a pipeline run. Options: `--dry-run` (no model calls, writes a report), `
 Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs. Option: `--output-dir`.
 
 ### `generate_dataset_overview.py`
-Writes the overview between the markers in the repository's `README.md`: summary, source registry, field table with the descriptions from `schema.py`, garment table and a check for images that appear in more than one post.
+Writes the overview between the markers in the repository's `README.md`: summary, source registry with the posts skipped as republished per source, field table with the descriptions from `schema.py`, garment table and a check for images that appear in more than one post.
 
 ## Run Orchestration
 
 ### `pipeline.py`
-Executes one pipeline run (`DailyRun`): refreshes the feeds, selects the posts, processes each post and saves records and state after every post. External services (feeds, pages, images, Gemini) are passed in as `Services`, so that tests can replace them. Counters are written to the run log.
+Executes one pipeline run (`DailyRun`): refreshes the feeds, selects the posts, processes each post and saves records and state after every post. External services (feeds, pages, images, Gemini) are passed in as `Services`, so that tests can replace them. Counters, including the number of due posts before the selection caps, are written to the run log.
 
 ### `settings.py`
 Settings that may change between runs, read from environment variables, and the output folder (`data/` in GitHub Actions, `~/Downloads/style_dataset/` locally).
@@ -47,16 +47,16 @@ Settings that may change between runs, read from environment variables, and the 
 ## Sources and Posts
 
 ### `sources.py`
-The source registry (`state/sources.json`) and the lifecycle rules: admission, probation, retirement, dormancy and broken feeds. Infers countries from domains and feed language tags, and seeds the registry from the legacy records.
+The source registry (`state/sources.json`) and the lifecycle rules: admission, probation, retirement, dormancy, broken feeds and one source per feed. Infers countries from domains and feed language tags, and seeds the registry from the legacy records.
 
 ### `feeds.py`
-Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation and the probation quota.
+Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation and the probation quota. A post that appears in two feeds is selected once.
 
 ### `crawl.py`
 Fetches the rendered HTML of post pages with crawl4ai and checks the HTTP status.
 
 ### `content.py`
-Selects the article element of a page and extracts its text, image candidates (with `srcset`, lazy-loading attributes and captions), external and shopping links and the canonical URL. Detects republished posts from WordPress upload paths.
+Selects the article element of a page (generic selectors, then the post containers of the Showit and Elementor site builders) and extracts its text, image candidates (with `srcset`, lazy-loading attributes and captions), external and shopping links and the canonical URL. Detects old images and republished posts from WordPress upload paths.
 
 ### `images.py`
 Downloads image candidates, applies the EXIF orientation, filters by size and shape, computes the dHash and removes duplicates within the post and against the analyzed images.

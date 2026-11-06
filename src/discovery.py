@@ -467,12 +467,12 @@ def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: F
             update.update(country=country, country_basis="model", country_lookup=today)
         if language:
             update["language"] = language
-        entry = entry.model_copy(update=update)
-        if not registry.admit(entry):
+        stored = registry.admit(entry.model_copy(update=update))
+        if stored is None:
             summary["registry full"] += 1
             break
-        summary[entry.status] += 1
-        if entry.status in ADMITTED_STATUSES:
+        summary[stored.status] += 1
+        if stored.status in ADMITTED_STATUSES:
             admitted += 1
     return summary
 

@@ -416,7 +416,8 @@ def select_posts(
     Each source contributes at most ``max_posts_per_source`` posts, oldest
     first. The sources take turns: first the oldest post of every source, then
     the second, and so on, until ``max_posts_per_run`` is reached. Sources on
-    probation contribute at most ``max_probation_posts_per_run`` posts.
+    probation contribute at most ``max_probation_posts_per_run`` posts. A post
+    that appears in the feeds of two sources is selected once.
 
     Args:
         feeds: The fetched feeds of the active and probation sources.
@@ -432,6 +433,7 @@ def select_posts(
         for feed in feeds
     ]
     selected: list[SelectedPost] = []
+    selected_keys: set[str] = set()
     probation_count = 0
     for round_index in range(settings.max_posts_per_source):
         batch = [(feed, posts[round_index]) for feed, posts in per_source if len(posts) > round_index]
@@ -439,9 +441,40 @@ def select_posts(
         for feed, post in batch:
             if len(selected) >= settings.max_posts_per_run:
                 return selected
+            # Two sources can read the same feed, for example two domains of one blog
+            if post.key in selected_keys:
+                continue
             if feed.probation:
                 if probation_count >= settings.max_probation_posts_per_run:
                     continue
                 probation_count += 1
             selected.append(post)
+            selected_keys.add(post.key)
     return selected
+
+
+def count_due_posts(
+    feeds: Sequence[SourceFeed], state: PipelineState, settings: Settings, today: date
+) -> tuple[int, int]:
+    """Counts the posts that are due in a run, before the caps of the selection apply.
+
+    Together with the number of selected posts, this shows whether the caps
+    limit a run or whether the sources had fewer posts to offer.
+
+    Args:
+        feeds: The fetched feeds of the active and probation sources.
+        state: The post state.
+        settings: The run settings.
+        today: Date of the run.
+
+    Returns:
+        tuple[int, int]: The number of distinct due posts, and the number of
+        sources with at least one due post.
+    """
+    keys: set[str] = set()
+    sources = 0
+    for feed in feeds:
+        candidates = _candidates_for_source(feed, state, settings, today)
+        keys.update(post.key for post in candidates)
+        sources += bool(candidates)
+    return len(keys), sources
