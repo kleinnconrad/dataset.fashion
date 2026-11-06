@@ -50,7 +50,7 @@ Settings that may change between runs, read from environment variables, and the 
 The source registry (`state/sources.json`) and the lifecycle rules: admission, probation, retirement, dormancy, broken feeds and one source per feed. Infers countries from domains and feed language tags, and seeds the registry from the legacy records.
 
 ### `feeds.py`
-Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation and the probation quota. A post that appears in two feeds is selected once.
+Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation, ranking by recent yield and the probation quota. A post that appears in two feeds is selected once.
 
 ### `crawl.py`
 Fetches the rendered HTML of post pages with crawl4ai and checks the HTTP status.

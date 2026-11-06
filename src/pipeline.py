@@ -45,7 +45,14 @@ from images import ByteFetcher, ImageSelection, fetch_image_bytes, select_images
 from records import PostMetadata, SourceMetadata, build_records, is_excluded
 from schema import ImageRef
 from settings import Settings
-from sources import SourceEntry, SourceRegistry, record_feed_result, record_post_outcome, seed_from_legacy
+from sources import (
+    SourceEntry,
+    SourceRegistry,
+    recent_yield,
+    record_feed_result,
+    record_post_outcome,
+    seed_from_legacy,
+)
 from state import PipelineState, PostEntry, append_run_log, atomic_write_text
 from storage import append_records
 from urls import normalize_url
@@ -210,7 +217,8 @@ class DailyRun:
                 self.stats.feeds_failed += 1
                 continue
             self.stats.feeds_ok += 1
-            feeds.append(SourceFeed(source.source_id, source.status == "probation", feed.posts))
+            feeds.append(SourceFeed(source.source_id, source.status == "probation", feed.posts,
+                                    recent_yield(source)))
         return feeds
 
     async def _content(self, post: SelectedPost, report: dict[str, Any]) -> Optional[PostContent]:

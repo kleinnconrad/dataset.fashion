@@ -225,3 +225,19 @@ def test_count_due_posts_ignores_the_caps(tmp_path: Path) -> None:
     assert len(select_posts(feeds, state, capped, TODAY)) == 2
     # Four shared posts are counted once; the post from 45 days ago is outside the lookback period
     assert count_due_posts(feeds, state, capped, TODAY) == (5, 3)
+
+
+def test_later_rounds_prefer_sources_with_a_higher_yield(tmp_path: Path) -> None:
+    state = PipelineState(tmp_path, {}, {})
+    feeds = [
+        SourceFeed("good.example", False, posts_for("good.example", [1, 2, 3]), recent_yield=1.0),
+        SourceFeed("fair.example", False, posts_for("fair.example", [4, 5, 6]), recent_yield=0.5),
+        SourceFeed("new.example", False, posts_for("new.example", [7, 8]), recent_yield=None),
+        SourceFeed("poor.example", False, posts_for("poor.example", [9, 10, 11]), recent_yield=1 / 3),
+    ]
+    selected = select_posts(feeds, state, settings(max_posts_per_run=8), TODAY)
+    # Round 1 by age; round 2 by yield, then age; the poor source gets only its round 1 post
+    assert [post.title for post in selected] == [
+        "poor.example 11", "new.example 8", "fair.example 6", "good.example 3",
+        "good.example 2", "new.example 7", "fair.example 5", "good.example 1",
+    ]

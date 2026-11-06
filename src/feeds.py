@@ -38,6 +38,10 @@ NON_FASHION_PATTERN = re.compile(
     r"\b(recipes?|books?|reading|podcasts?|interiors?|decor|giveaways?|skincare|gift guides?)\b",
     re.IGNORECASE,
 )
+# Sources whose recent yield (share of recent posts with an outfit) is below this get one post per run
+LOW_YIELD_BELOW = 0.5
+# Rank of sources without a known recent yield in the later rounds of the selection
+UNKNOWN_YIELD_RANK = 0.5
 
 
 @dataclass(frozen=True)
@@ -341,10 +345,13 @@ class SourceFeed:
         source_id (str): The source.
         probation (bool): Whether the source is on probation.
         posts (tuple[FeedPost, ...]): The entries of its feed.
+        recent_yield (Optional[float]): Share of the source's recent posts
+            that produced an outfit; None if too few posts were processed.
     """
     source_id: str
     probation: bool
     posts: tuple[FeedPost, ...]
+    recent_yield: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -408,16 +415,29 @@ def _candidates_for_source(
     return sorted(candidates.values(), key=lambda post: (post.published or today, post.key))
 
 
+def _yield_rank(feed: SourceFeed) -> float:
+    """Returns the recent yield of a source, or UNKNOWN_YIELD_RANK if it is unknown."""
+    return UNKNOWN_YIELD_RANK if feed.recent_yield is None else feed.recent_yield
+
+
+def _is_low_yield(feed: SourceFeed) -> bool:
+    """Returns True if the recent yield of a source is known and below LOW_YIELD_BELOW."""
+    return feed.recent_yield is not None and feed.recent_yield < LOW_YIELD_BELOW
+
+
 def select_posts(
     feeds: Sequence[SourceFeed], state: PipelineState, settings: Settings, today: date
 ) -> list[SelectedPost]:
     """Selects the posts of a run.
 
     Each source contributes at most ``max_posts_per_source`` posts, oldest
-    first. The sources take turns: first the oldest post of every source, then
-    the second, and so on, until ``max_posts_per_run`` is reached. Sources on
-    probation contribute at most ``max_probation_posts_per_run`` posts. A post
-    that appears in the feeds of two sources is selected once.
+    first. The sources take turns until ``max_posts_per_run`` is reached. In
+    the first round every source contributes its oldest post, oldest posts
+    first. In the later rounds the sources with a higher recent yield come
+    first, and sources whose recent yield is below LOW_YIELD_BELOW contribute
+    nothing more. Sources on probation contribute at most
+    ``max_probation_posts_per_run`` posts. A post that appears in the feeds of
+    two sources is selected once.
 
     Args:
         feeds: The fetched feeds of the active and probation sources.
@@ -437,7 +457,11 @@ def select_posts(
     probation_count = 0
     for round_index in range(settings.max_posts_per_source):
         batch = [(feed, posts[round_index]) for feed, posts in per_source if len(posts) > round_index]
-        batch.sort(key=lambda item: (item[1].published or today, item[1].source_id))
+        if round_index == 0:
+            batch.sort(key=lambda item: (item[1].published or today, item[1].source_id))
+        else:
+            batch = [item for item in batch if not _is_low_yield(item[0])]
+            batch.sort(key=lambda item: (-_yield_rank(item[0]), item[1].published or today, item[1].source_id))
         for feed, post in batch:
             if len(selected) >= settings.max_posts_per_run:
                 return selected
