@@ -18,6 +18,7 @@ from sources import (
     infer_country,
     language_code,
     record_feed_result,
+    recent_yield,
     record_post_outcome,
     seed_from_legacy,
 )
@@ -249,3 +250,16 @@ def test_seed_from_legacy(tmp_path: Path, web: Any, rss: Any) -> None:
     registry.save()
     reloaded = SourceRegistry.load(tmp_path / "state")
     assert {e.source_id: e.model_dump() for e in reloaded} == {e.source_id: e.model_dump() for e in registry}
+
+
+@pytest.mark.parametrize(
+    ("outcomes", "expected"),
+    [
+        ([], None),
+        ([True, False, True], None),
+        ([True, False, True, False], 0.5),
+        ([False] * 6 + [True, True, True, True, False, False], 4 / 6),
+    ],
+)
+def test_recent_yield_uses_the_last_posts(outcomes: list[bool], expected: Optional[float]) -> None:
+    assert recent_yield(source(recent_outcomes=outcomes)) == expected

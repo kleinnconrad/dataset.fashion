@@ -42,7 +42,7 @@ dataset.fashion/
 
 1. Load the source registry. If it is empty, seed it from the domains of the legacy records.
 2. Fetch the feeds of the active and probation sources and update their feed statistics.
-3. Select the posts: published within 30 days, not yet processed or due for a retry, not about clearly unrelated topics; at most 3 per source, 40 per run and 10 from sources on probation; a post in the feeds of two sources once.
+3. Select the posts: published within 30 days, not yet processed or due for a retry, not about clearly unrelated topics; at most 3 per source, 40 per run and 10 from sources on probation; a post in the feeds of two sources once. After each source's oldest post, sources with a higher recent yield come first, and sources whose recent yield is below 50% get no further post.
 4. For each post:
    1. Take the content from the feed if it includes images, else render the page with crawl4ai.
    2. Select the article element and extract text, image candidates, links and the canonical URL.
@@ -62,7 +62,7 @@ dataset.fashion/
 
 1. Fetch the feeds of dormant and broken sources and apply the lifecycle rules, so that sources that publish again return.
 2. Ask Gemini with Google Search for the country and language of sources whose country was so far inferred only from the domain or the feed language (20 domains per request).
-3. Ask Gemini with Google Search for new personal style blogs, with a search focus that changes every week. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week.
+3. Ask Gemini with Google Search for new personal style blogs, in up to 4 searches with successive focuses, starting with the focus of the week. A search without results does not end the discovery. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week, and the searches end once that number is reached.
 
 The workflow commits `data/state/`.
 

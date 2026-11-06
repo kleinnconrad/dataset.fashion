@@ -39,6 +39,9 @@ BROKEN_AFTER_FAILURES = 7       # consecutive pipeline runs with a failing feed
 LEGACY_ACTIVE_MIN_RECORDS = 5   # legacy sources with this many records skip probation
 MAX_ADMITTED_SOURCES = 60       # active and probation sources together
 SEED_WORKERS = 8
+# Post selection
+YIELD_WINDOW = 6                # processed posts that make up the recent yield of a source
+YIELD_MIN_OUTCOMES = 4          # with fewer processed posts the recent yield is unknown
 
 SourceStatus = Literal["probation", "active", "dormant", "broken", "rejected", "retired"]
 SourceOrigin = Literal["legacy", "discovery"]
@@ -217,6 +220,22 @@ def _shared_feed_preference(source: SourceEntry) -> tuple[bool, bool, int, date,
         own_domain = False
     return (not own_domain, source.status not in ADMITTED_STATUSES, -source.posts_processed, source.added,
             source.source_id)
+
+
+def recent_yield(source: SourceEntry) -> Optional[float]:
+    """Returns the share of the source's last processed posts that produced an outfit.
+
+    Args:
+        source: The source.
+
+    Returns:
+        Optional[float]: The share among the last YIELD_WINDOW processed posts,
+        or None with fewer than YIELD_MIN_OUTCOMES processed posts.
+    """
+    window = source.recent_outcomes[-YIELD_WINDOW:]
+    if len(window) < YIELD_MIN_OUTCOMES:
+        return None
+    return sum(window) / len(window)
 
 
 def record_post_outcome(source: SourceEntry, produced_outfit: bool) -> SourceEntry:

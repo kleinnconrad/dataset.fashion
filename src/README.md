@@ -31,7 +31,7 @@ This directory contains the modules of the pipeline. The modules import each oth
 Starts a pipeline run. Options: `--dry-run` (no model calls, writes a report), `--max-posts`, `--source` and `--output-dir`. Exits with code 1 if Gemini rejects requests and with code 2 if the API key is missing.
 
 ### `discovery.py`
-Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs. Option: `--output-dir`.
+Weekly maintenance of the source registry: re-checks dormant and broken sources, looks up countries with Gemini and Google Search, and discovers and evaluates new blogs in several searches with successive focuses. Option: `--output-dir`.
 
 ### `generate_dataset_overview.py`
 Writes the overview between the markers in the repository's `README.md`: summary, source registry with the posts skipped as republished per source, field table with the descriptions from `schema.py`, garment table and a check for images that appear in more than one post.
@@ -50,7 +50,7 @@ Settings that may change between runs, read from environment variables, and the 
 The source registry (`state/sources.json`) and the lifecycle rules: admission, probation, retirement, dormancy, broken feeds and one source per feed. Infers countries from domains and feed language tags, and seeds the registry from the legacy records.
 
 ### `feeds.py`
-Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation and the probation quota. A post that appears in two feeds is selected once.
+Finds the feed of a blog (linked feeds, then common WordPress, Blogger and Squarespace paths), parses RSS and Atom, filters posts on unrelated topics and selects the posts of a run with per-source caps, rotation, ranking by recent yield and the probation quota. A post that appears in two feeds is selected once.
 
 ### `crawl.py`
 Fetches the rendered HTML of post pages with crawl4ai and checks the HTTP status.

@@ -5,8 +5,9 @@ The weekly run
 1. re-checks the feeds of dormant and broken sources, so that they can return,
 2. asks Gemini with Google Search for the country and language of sources
    whose country was so far inferred only from the domain or the feed,
-3. asks Gemini with Google Search for new blogs, with a search focus that
-   changes every week, and admits the candidates that pass the admission rules.
+3. asks Gemini with Google Search for new blogs, in up to SEARCHES_PER_WEEK
+   searches with successive focuses, starting with the focus of the week, and
+   admits the candidates that pass the admission rules.
 
 Usage:
     uv run python src/discovery.py [--output-dir PATH]
@@ -18,7 +19,7 @@ import re
 import sys
 import time
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
@@ -62,8 +63,12 @@ logger = logging.getLogger(__name__)
 MAX_DISCOVERY_CALLS = 12
 LOOKUP_BATCH_SIZE = 20
 LOOKUP_REPEAT_DAYS = 180
-CANDIDATES_PER_RUN = 15
+CANDIDATES_PER_SEARCH = 15
 MAX_ADMISSIONS_PER_WEEK = 10
+# Searches per weekly run, each with the next focus; together with the country lookups within MAX_DISCOVERY_CALLS
+SEARCHES_PER_WEEK = 4
+# Beginning of an answer that named no blog, kept in the run log
+ANSWER_EXCERPT_CHARS = 300
 RECHECK_WORKERS = 8
 # Google recommends MEDIUM or higher for requests with tools; lower levels can end the searches early. Set explicitly,
 # so that the default level of the configured model does not matter. At most 12 requests per week.
@@ -383,49 +388,107 @@ def lookup_countries(registry: SourceRegistry, model: Any, today: date) -> int:
     return updated
 
 
+def search_focuses(today: date, count: int = SEARCHES_PER_WEEK) -> list[str]:
+    """Returns the focuses of the week's searches: the focus of the week, then the following ones.
+
+    Args:
+        today: Date of the run.
+        count: Number of searches.
+
+    Returns:
+        list[str]: At most ``count`` different focuses.
+    """
+    start = SEARCH_FOCUS.index(weekly_focus(today))
+    return [SEARCH_FOCUS[(start + offset) % len(SEARCH_FOCUS)] for offset in range(min(count, len(SEARCH_FOCUS)))]
+
+
 def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: Fetcher = http_get,
-                     focus: Optional[str] = None) -> Counter:
+                     focuses: Optional[Sequence[str]] = None,
+                     search_log: Optional[list[dict[str, Any]]] = None) -> Counter:
     """Asks Gemini for new blogs and admits those that pass the admission rules.
 
-    Candidates are the blogs named in the answer and the domains of the search
-    results behind the answer. Every evaluated candidate is stored, also when it
-    is rejected, so that it is not proposed again. At most MAX_CANDIDATES_EVALUATED
-    candidates are evaluated and at most MAX_ADMISSIONS_PER_WEEK admitted.
+    One search is sent per focus, until MAX_ADMISSIONS_PER_WEEK sources are
+    admitted, the registry is full or MAX_DISCOVERY_CALLS is reached. A search
+    without results does not end the discovery; the next focus is tried.
 
     Args:
         registry: The source registry.
         model: A ``SearchModel`` or a compatible test double.
         today: Date of the run.
         fetch: Fetcher function.
-        focus: Search focus; defaults to the focus of the week.
+        focuses: Search focuses in order; defaults to ``search_focuses(today)``.
+        search_log: List that receives one entry per search, filled while the
+            search runs, so that it is complete up to an error that ends the run.
 
     Returns:
-        Counter: Candidates by result.
+        Counter: Candidates of all searches by result.
     """
     summary: Counter = Counter()
-    if registry.admitted_count() >= MAX_ADMITTED_SOURCES:
-        summary["registry full"] += 1
-        return summary
+    admitted = 0
+    for focus in focuses if focuses is not None else search_focuses(today):
+        if registry.admitted_count() >= MAX_ADMITTED_SOURCES:
+            if not summary["registry full"]:
+                summary["registry full"] += 1
+            break
+        if admitted >= MAX_ADMISSIONS_PER_WEEK:
+            break
+        if model.calls >= MAX_DISCOVERY_CALLS:
+            summary["call budget reached"] += 1
+            break
+        report: dict[str, Any] = {"focus": focus}
+        if search_log is not None:
+            search_log.append(report)
+        admitted += _search(registry, model, today, fetch, focus, MAX_ADMISSIONS_PER_WEEK - admitted, summary,
+                            report)
+    return summary
+
+
+def _search(registry: SourceRegistry, model: Any, today: date, fetch: Fetcher, focus: str, max_admissions: int,
+            summary: Counter, report: dict[str, Any]) -> int:
+    """Sends one discovery search and evaluates its candidates.
+
+    Candidates are the blogs named in the answer and the domains of the search
+    results behind the answer. Every evaluated candidate is stored, also when it
+    is rejected, so that it is not proposed again. At most MAX_CANDIDATES_EVALUATED
+    candidates are evaluated.
+
+    Args:
+        registry: The source registry.
+        model: A ``SearchModel`` or a compatible test double.
+        today: Date of the run.
+        fetch: Fetcher function.
+        focus: Search focus.
+        max_admissions: Number of sources that may still be admitted this week.
+        summary: Candidates by result; updated in place.
+        report: Log entry of this search; updated in place with the number of
+            candidates, the admitted sources and, if the answer named no blog,
+            the beginning of the answer.
+
+    Returns:
+        int: Number of admitted sources.
+    """
     known = ", ".join(sorted(entry.source_id for entry in registry)) or "(none)"
     prompt = DISCOVERY_PROMPT.format(
         current_month=_month_name(today),
         previous_month=_month_name(today.replace(day=1) - timedelta(days=1)),
-        focus=focus or weekly_focus(today),
-        count=CANDIDATES_PER_RUN,
+        focus=focus,
+        count=CANDIDATES_PER_SEARCH,
         excluded=known,
     )
     try:
         answer = model.ask(prompt)
     except TransientExtractionError as e:
-        logger.warning("Discovery failed: %s", e)
+        logger.warning("Discovery search failed (%s): %s", focus, e)
         summary["no answer"] += 1
-        return summary
+        report["error"] = str(e)[:ANSWER_EXCERPT_CHARS]
+        return 0
     candidates: list[CandidateAnswer] = []
     try:
         candidates = parse_answers(answer.text, CandidateAnswer)
     except ValueError as e:
-        logger.warning("Discovery answer without a JSON list (%s): %r", e, answer.text[:300])
+        logger.warning("Discovery answer without a JSON list (%s): %r", e, answer.text[:ANSWER_EXCERPT_CHARS])
         summary["answer without list"] += 1
+        report["answer"] = answer.text[:ANSWER_EXCERPT_CHARS]
     # The domains of the search results are candidates too, also when the answer text is unusable
     proposed = set()
     for candidate in candidates:
@@ -437,9 +500,14 @@ def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: F
         if domain not in proposed:
             candidates.append(CandidateAnswer(post_url=f"https://{domain}/"))
             summary["from search sources"] += 1
+    report["candidates"] = len(candidates)
+    report["admitted"] = []
+    if not candidates:
+        logger.warning("Discovery search named no blog (%s): %r", focus, answer.text[:ANSWER_EXCERPT_CHARS])
+        report["answer"] = answer.text[:ANSWER_EXCERPT_CHARS]
     admitted = 0
     for candidate in candidates[:MAX_CANDIDATES_EVALUATED]:
-        if admitted >= MAX_ADMISSIONS_PER_WEEK:
+        if admitted >= max_admissions:
             summary["weekly limit reached"] += 1
             break
         url = candidate.post_url.strip()
@@ -474,7 +542,8 @@ def discover_sources(registry: SourceRegistry, model: Any, today: date, fetch: F
         summary[stored.status] += 1
         if stored.status in ADMITTED_STATUSES:
             admitted += 1
-    return summary
+            report["admitted"].append(stored.source_id)
+    return admitted
 
 
 def weekly_maintenance(settings: Settings, today: date, model: Any, fetch: Fetcher = http_get,
@@ -498,14 +567,16 @@ def weekly_maintenance(settings: Settings, today: date, model: Any, fetch: Fetch
     changes = recheck_paused_sources(registry, today, fetch)
     summary["source_transitions"] = [{"source": s, "from": old, "to": new} for s, old, new in changes]
     registry.save()
+    searches: list[dict[str, Any]] = []
     try:
         summary["countries_set"] = lookup_countries(registry, model, today)
         registry.save()
-        summary["candidates"] = dict(discover_sources(registry, model, today, fetch))
+        summary["candidates"] = dict(discover_sources(registry, model, today, fetch, search_log=searches))
     except RunStopError as e:
         logger.warning("Weekly maintenance stopped: %s", e)
         summary["stopped_early"] = f"{type(e).__name__}: {e}"
         summary["fatal"] = isinstance(e, FatalRequestError)
+    summary["searches"] = searches
     registry.save()
     summary["gemini_calls"] = model.calls
     summary["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")

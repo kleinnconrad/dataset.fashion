@@ -16,6 +16,7 @@ from discovery import (
     lookup_countries,
     parse_json_array,
     recheck_paused_sources,
+    search_focuses,
     weekly_focus,
     weekly_maintenance,
 )
@@ -133,7 +134,7 @@ def test_discovery_admits_and_records_candidates(tmp_path: Path, web: Any, rss: 
         {"homepage": "https://nofeed.example/"},
         {"homepage": "not a url"},
     ]])
-    summary = discover_sources(registry, model, TODAY, web)
+    summary = discover_sources(registry, model, TODAY, web, focuses=[weekly_focus(TODAY)])
     assert dict(summary) == {"probation": 1, "known": 1, "not a blog": 2, "rejected": 1, "invalid url": 1}
     new = registry.get("new.example")
     assert (new.status, new.origin, new.country, new.country_basis, new.language) == (
@@ -149,7 +150,7 @@ def test_search_sources_are_candidates_without_a_list(tmp_path: Path, web: Any, 
     web.add_feed("https://grounded.example/feed/", recent_feed(rss, "grounded.example", [2, 9]))
     answer = SearchAnswer(text="I could not find posts from these months.",
                           source_domains=("grounded.example", "vogue.com", "known.example"))
-    summary = discover_sources(registry, FakeSearchModel([answer]), TODAY, web)
+    summary = discover_sources(registry, FakeSearchModel([answer]), TODAY, web, focuses=[weekly_focus(TODAY)])
     assert dict(summary) == {"answer without list": 1, "from search sources": 3, "probation": 1,
                              "not a blog": 1, "known": 1}
     assert registry.get("grounded.example").country_basis != "model"
@@ -185,6 +186,47 @@ def test_discovery_respects_the_weekly_limit(tmp_path: Path, web: Any, rss: Any,
     assert "two.example" not in registry
 
 
+def test_search_focuses_follow_the_focus_of_the_week() -> None:
+    first = discovery_module.SEARCH_FOCUS.index(weekly_focus(TODAY))
+    focuses = search_focuses(TODAY, 3)
+    assert focuses[0] == weekly_focus(TODAY)
+    assert focuses == [discovery_module.SEARCH_FOCUS[(first + n) % len(discovery_module.SEARCH_FOCUS)] for n in range(3)]
+    assert len(set(search_focuses(TODAY, 50))) == len(discovery_module.SEARCH_FOCUS)
+
+
+def test_discovery_continues_after_searches_without_blogs(tmp_path: Path, web: Any, rss: Any) -> None:
+    registry = registry_with(tmp_path)
+    web.add_feed("https://found.example/feed/", recent_feed(rss, "found.example", [2, 5]))
+    model = FakeSearchModel(["No blogs found.", [{"post_url": "https://found.example/"}],
+                             TransientExtractionError("busy")])
+    log: list[dict[str, Any]] = []
+    summary = discover_sources(registry, model, TODAY, web, focuses=["focus a", "focus b", "focus c"], search_log=log)
+    assert dict(summary) == {"answer without list": 1, "probation": 1, "no answer": 1}
+    assert log == [
+        {"focus": "focus a", "answer": "No blogs found.", "candidates": 0, "admitted": []},
+        {"focus": "focus b", "candidates": 1, "admitted": ["found.example"]},
+        {"focus": "focus c", "error": "busy"},
+    ]
+    assert ["Focus: focus b." in prompt for prompt in model.prompts] == [False, True, False]
+    # A blog found by an earlier search is excluded in the later prompts
+    assert "found.example" not in model.prompts[1] and "found.example" in model.prompts[2]
+
+
+def test_discovery_stops_at_the_weekly_limit_and_the_call_budget(tmp_path: Path, web: Any, rss: Any,
+                                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    web.add_feed("https://one.example/feed/", recent_feed(rss, "one.example", [2, 5]))
+    monkeypatch.setattr(discovery_module, "MAX_ADMISSIONS_PER_WEEK", 1)
+    model = FakeSearchModel([[{"post_url": "https://one.example/"}]])
+    assert dict(discover_sources(registry_with(tmp_path), model, TODAY, web)) == {"probation": 1}
+    assert model.calls == 1
+
+    monkeypatch.setattr(discovery_module, "MAX_DISCOVERY_CALLS", 3)
+    model = FakeSearchModel([[], []])
+    model.calls = 1
+    summary = discover_sources(registry_with(tmp_path / "other"), model, TODAY, web)
+    assert dict(summary) == {"call budget reached": 1} and model.calls == 3
+
+
 def test_discovery_is_skipped_when_the_registry_is_full(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(discovery_module, "MAX_ADMITTED_SOURCES", 1)
     model = FakeSearchModel([])
@@ -213,9 +255,11 @@ def test_weekly_maintenance_saves_and_logs(tmp_path: Path, web: Any, rss: Any) -
     settings = Settings(output_dir=tmp_path)
     registry_with(settings.state_dir, entry("alpha.example"), entry("beta.example", status="dormant")).save()
     web.add_feed("https://beta.example/feed/", recent_feed(rss, "beta.example", [200]))
-    model = FakeSearchModel([[{"domain": "alpha.example", "country": "AU"}], []])
+    model = FakeSearchModel([[{"domain": "alpha.example", "country": "AU"}], [], [], [], []])
     summary = weekly_maintenance(settings, TODAY, model, web)
-    assert summary["countries_set"] == 1 and summary["candidates"] == {} and summary["gemini_calls"] == 2
+    assert summary["countries_set"] == 1 and summary["candidates"] == {} and summary["gemini_calls"] == 5
+    assert [search["focus"] for search in summary["searches"]] == search_focuses(TODAY)
+    assert summary["searches"][0] == {"focus": weekly_focus(TODAY), "candidates": 0, "admitted": [], "answer": "[]"}
     assert SourceRegistry.load(settings.state_dir).get("alpha.example").country == "AU"
     log = (settings.state_dir / RUN_LOG_FILE).read_text(encoding="utf-8").splitlines()
     assert json.loads(log[-1])["mode"] == "maintenance"

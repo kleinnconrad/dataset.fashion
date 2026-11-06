@@ -262,6 +262,12 @@ def test_outfits_of_minors_are_not_stored(setup: dict[str, Any]) -> None:
     assert SourceRegistry.load(setup["settings"].state_dir).get(BLOG).posts_with_outfits == 0
 
 
+def test_low_yield_source_gets_one_post_per_run(setup: dict[str, Any]) -> None:
+    add_source(setup["settings"], outcomes=[True] + [False] * 5)
+    stats = run(setup)
+    assert (stats.posts_due, stats.posts_selected) == (2, 1)
+
+
 def test_probation_source_is_promoted(setup: dict[str, Any]) -> None:
     add_source(setup["settings"], status="probation", outcomes=[False])
     stats = run(setup)
