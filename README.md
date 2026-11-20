@@ -19,9 +19,9 @@ A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in Gi
 
 ## Dataset Overview
 <!-- DATASET_OVERVIEW_START -->
-**Last updated:** 2026-11-17 09:23 UTC
+**Last updated:** 2026-11-20 08:47 UTC
 
-- **Schema 2.0 records:** 1,292 outfits from 325 posts of 48 sources, published 2026-09-11 to 2026-11-17
+- **Schema 2.0 records:** 1,379 outfits from 354 posts of 48 sources, published 2026-09-11 to 2026-11-20
 - **Images reused across posts:** 0
 - **Legacy records (schema 1.x):** 1,457 records in 119 files (2026-06-14 to 2026-10-10); collected without deduplication and without publish dates, and not included in the tables below
 - **Sources:** 44 active, 5 probation, 73 dormant, 10 broken, 55 rejected, 2 retired
@@ -30,107 +30,107 @@ A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in Gi
 
 | Source | Country | Posts | Posts with outfits | Skipped as republished | Last post |
 |---|---|---|---|---|---|
-| pumpsandpushups.com | US | 29 | 96.6% (28) | 1 | 2026-11-15 |
-| fashionshouldbefun.com | US | 25 | 68.0% (17) | 0 | 2026-11-16 |
-| russh.com | AU | 25 | 72.0% (18) | 1 | 2026-11-11 |
-| thefashiontag.com | GB | 23 | 56.5% (13) | 0 | 2026-11-13 |
-| shelbeeontheedge.com | US | 21 | 81.0% (17) | 0 | 2026-11-16 |
-| awellstyledlife.com | US | 18 | 94.4% (17) | 1 | 2026-11-16 |
-| loverlygrey.com | US | 18 | 100.0% (18) | 0 | 2026-11-13 |
-| unefemme.net | US | 18 | 83.3% (15) | 0 | 2026-11-17 |
-| thewelldressedlife.com | US | 16 | 56.2% (9) | 2 | 2026-11-13 |
-| caphillstyle.com | US | 15 | 53.3% (8) | 13 | 2026-11-13 |
+| pumpsandpushups.com | US | 32 | 96.9% (31) | 1 | 2026-11-19 |
+| russh.com | AU | 27 | 70.4% (19) | 1 | 2026-11-18 |
+| fashionshouldbefun.com | US | 26 | 69.2% (18) | 0 | 2026-11-18 |
+| thefashiontag.com | GB | 24 | 58.3% (14) | 0 | 2026-11-19 |
+| awellstyledlife.com | US | 21 | 95.2% (20) | 1 | 2026-11-20 |
+| shelbeeontheedge.com | US | 21 | 81.0% (17) | 0 | 2026-11-20 |
+| loverlygrey.com | US | 19 | 100.0% (19) | 0 | 2026-11-19 |
+| unefemme.net | US | 18 | 83.3% (15) | 1 | 2026-11-19 |
+| thewelldressedlife.com | US | 17 | 58.8% (10) | 2 | 2026-11-19 |
+| caphillstyle.com | US | 16 | 50.0% (8) | 13 | 2026-11-19 |
+| thecurvyfashionista.com | US | 14 | 100.0% (14) | 6 | 2026-11-19 |
 | reneeruin.com | AU | 13 | 100.0% (13) | 0 | 2026-10-15 |
-| thecurvyfashionista.com | US | 12 | 100.0% (12) | 6 | 2026-11-16 |
-| midlifechic.com | GB | 11 | 72.7% (8) | 3 | 2026-11-13 |
+| mummabstylish.com | GB | 12 | 100.0% (12) | 0 | 2026-11-19 |
+| permanentstyle.com | GB | 12 | 91.7% (11) | 0 | 2026-11-18 |
+| midlifechic.com | GB | 11 | 72.7% (8) | 3 | 2026-11-17 |
+| style-splash.com | GB | 11 | 72.7% (8) | 0 | 2026-11-19 |
 | vintagevixon.blogspot.com | GB | 11 | 100.0% (11) | 0 | 2026-11-16 |
 | fashion-note.me | US | 10 | 100.0% (10) | 0 | 2026-10-06 |
 | 9to5chic.com | US | 9 | 88.9% (8) | 0 | 2026-10-29 |
-| mummabstylish.com | GB | 9 | 100.0% (9) | 0 | 2026-11-16 |
 | nofearoffashion.com | NL | 9 | 100.0% (9) | 0 | 2026-11-14 |
-| permanentstyle.com | GB | 9 | 88.9% (8) | 0 | 2026-11-16 |
+| merricksart.com | US | 8 | 62.5% (5) | 0 | 2026-11-19 |
 | sewliberated.com | US | 8 | 75.0% (6) | 1 | 2026-11-05 |
-| style-splash.com | GB | 8 | 75.0% (6) | 0 | 2026-11-12 |
-| merricksart.com | US | 7 | 57.1% (4) | 0 | 2026-11-11 |
+| marissawearsanoutfit.com | US | 7 | 100.0% (7) | 0 | 2026-11-18 |
+| bluecollarredlipstick.com | US | 6 | 50.0% (3) | 0 | 2026-11-17 |
 | isthismutton.com | GB | 6 | 83.3% (5) | 0 | 2026-11-17 |
-| marissawearsanoutfit.com | US | 6 | 100.0% (6) | 0 | 2026-11-05 |
-| bluecollarredlipstick.com | US | 5 | 60.0% (3) | 0 | 2026-11-10 |
 | cellajane.com | US | 5 | 100.0% (5) | 0 | 2026-10-28 |
-| livinginyellow.com | US | 4 | 50.0% (2) | 0 | 2026-11-12 |
+| livinginyellow.com | US | 5 | 60.0% (3) | 0 | 2026-11-19 |
+| clairejustineoxox.com | GB | 4 | 100.0% (4) | 1 | 2026-11-16 |
+| invitadaperfecta.es | ES | 4 | 100.0% (4) | 0 | 2026-11-18 |
 | messymom.com | OM | 4 | 75.0% (3) | 0 | 2026-10-30 |
-| phyrra.net | NL | 4 | 75.0% (3) | 7 | 2026-11-11 |
-| poplinstyle.com | US | 4 | 75.0% (3) | 0 | 2026-11-05 |
 | ... 14 more | | | | | |
 
 **Fields (schema 2.0)**
 
 | Field | Description | Known values | Distinct values |
 |---|---|---|---|
-| `framing` | Widest view of the person among the images of this outfit. | 100.0% (1,292) | 4 |
-| `photo_context` | Who is shown: the blogger or another private person, models in a brand campaign or catalog image, or an editorial or street-style photo. | 97.0% (1,253) | 3 |
-| `gender` | Perceived gender presentation of the person. | 99.3% (1,283) | 2 |
-| `age_group` | Visually estimated age bracket of the person. | 99.8% (1,290) | 3 |
-| `style_category` | Primary style of the outfit. | 100.0% (1,292) | 14 |
-| `style_detail` | Refinement of the style in a few words, e.g. 'Relaxed weekend minimalism'. Null if not needed. | 75.9% (981) | 822 |
-| `aesthetic_tags` | Named aesthetics or micro-trends that the outfit clearly represents. Empty list if none. | 16.8% (217) | 15 |
-| `aesthetic_other` | A clearly represented aesthetic that is not in the list, in one to three words. Null if none. | 9.9% (128) | 63 |
-| `focal_garment_index` | Position (starting at 1) in the garments list of the piece that draws the eye most. Null if no piece stands out. | 92.0% (1,188) | 6 |
-| `layering_complexity` | Number of visible clothing layers on the upper body, from 1 (single layer) to 5 (heavy layering). | 100.0% (1,292) | 4 |
-| `overall_fit` | Overall fit of the outfit. | 99.8% (1,289) | 4 |
-| `silhouette` | Overall outline of the outfit. | 93.8% (1,212) | 7 |
-| `color_palette_type` | Overall color character of the outfit. | 99.7% (1,288) | 5 |
-| `color_contrast_strategy` | How the colors of the outfit are combined. | 99.5% (1,286) | 6 |
-| `occasion` | Most likely occasion the outfit is meant for. 'Unclear' if the images and text give no indication. | 96.5% (1,247) | 6 |
-| `setting` | Setting or background of the photos. | 99.1% (1,281) | 5 |
-| `season` | Season suggested by the clothing and the surroundings. 'Unclear' if they give no indication. | 74.5% (962) | 4 |
-| `weather` | Weather visible in the photos. 'Not visible' for indoor photos and whenever sky or conditions cannot be seen. | 26.6% (344) | 3 |
-| `hair_length` | Hair length of the person. | 93.5% (1,208) | 4 |
-| `hair_texture` | Hair texture of the person. | 92.2% (1,191) | 4 |
-| `hair_style_type` | How the hair is worn. | 93.8% (1,212) | 7 |
-| `hair_color` | Hair color of the person. | 92.6% (1,197) | 7 |
-| `hair_parting` | How the hair is parted. | 89.7% (1,159) | 4 |
-| `hair_finish` | Styling finish of the hair. | 92.2% (1,191) | 5 |
-| `makeup_style` | Makeup style of the person. | 87.9% (1,136) | 4 |
-| `brand_mentions` | Brands of this outfit that are named in the post title, text, tags, image captions or link texts. Do not infer brands from appearance. Empty list if none. | 51.5% (666) | 361 |
-| `price_segment` | Price segment suggested by the named brands or the text. 'Unknown' without such evidence. | 36.9% (477) | 3 |
-| `record_id` | Stable id derived from the post URL, the image hashes and the position of the outfit in the post. | 100.0% (1,292) | 1,292 |
-| `schema_version` | Version of the record schema. | 100.0% (1,292) | 1 |
-| `model` | Gemini model that produced the record. | 100.0% (1,292) | 3 |
-| `extraction_hash` | Hash of the prompt, response schema, model settings and image preprocessing. Records with the same hash were extracted under the same conditions. | 100.0% (1,292) | 7 |
-| `date_scraped` | UTC date of the extraction (YYYY-MM-DD). | 100.0% (1,292) | 12 |
-| `published_date` | Publish date of the post from its feed (YYYY-MM-DD). | 100.0% (1,292) | 65 |
-| `source_id` | Domain of the blog, without www. | 100.0% (1,292) | 48 |
-| `source_country` | ISO 3166-1 alpha-2 country of the blog. Null if unknown. | 98.6% (1,274) | 8 |
-| `source_country_basis` | How the country was determined: model (Gemini with web search), domain (country-code top-level domain), feed_language (region of the RSS language tag) or unknown. | 100.0% (1,292) | 3 |
-| `source_region` | Region derived from source_country. | 98.6% (1,274) | 4 |
-| `source_language` | Language of the blog from its feed (ISO 639-1). | 100.0% (1,292) | 3 |
-| `post_url` | URL of the post. | 100.0% (1,292) | 325 |
-| `canonical_url` | Canonical URL declared by the post page. | 57.0% (736) | 164 |
-| `post_title` | Title of the post. | 100.0% (1,292) | 325 |
-| `post_tags` | Categories and tags of the post from its feed. | 99.3% (1,283) | 785 |
-| `shopping_link_count` | Number of links to shops or affiliate networks in the post. | 100.0% (1,292) | 42 |
-| `outfit_colors` | Primary colors of the clothing and footwear, in the order of the garments list. | 98.6% (1,274) | 21 |
+| `framing` | Widest view of the person among the images of this outfit. | 100.0% (1,379) | 4 |
+| `photo_context` | Who is shown: the blogger or another private person, models in a brand campaign or catalog image, or an editorial or street-style photo. | 97.2% (1,340) | 3 |
+| `gender` | Perceived gender presentation of the person. | 99.3% (1,370) | 2 |
+| `age_group` | Visually estimated age bracket of the person. | 99.9% (1,377) | 3 |
+| `style_category` | Primary style of the outfit. | 100.0% (1,379) | 14 |
+| `style_detail` | Refinement of the style in a few words, e.g. 'Relaxed weekend minimalism'. Null if not needed. | 77.4% (1,068) | 899 |
+| `aesthetic_tags` | Named aesthetics or micro-trends that the outfit clearly represents. Empty list if none. | 17.4% (240) | 15 |
+| `aesthetic_other` | A clearly represented aesthetic that is not in the list, in one to three words. Null if none. | 10.2% (140) | 71 |
+| `focal_garment_index` | Position (starting at 1) in the garments list of the piece that draws the eye most. Null if no piece stands out. | 92.3% (1,273) | 6 |
+| `layering_complexity` | Number of visible clothing layers on the upper body, from 1 (single layer) to 5 (heavy layering). | 100.0% (1,379) | 4 |
+| `overall_fit` | Overall fit of the outfit. | 99.8% (1,376) | 4 |
+| `silhouette` | Overall outline of the outfit. | 94.1% (1,298) | 7 |
+| `color_palette_type` | Overall color character of the outfit. | 99.7% (1,375) | 5 |
+| `color_contrast_strategy` | How the colors of the outfit are combined. | 99.6% (1,373) | 6 |
+| `occasion` | Most likely occasion the outfit is meant for. 'Unclear' if the images and text give no indication. | 96.7% (1,334) | 6 |
+| `setting` | Setting or background of the photos. | 99.2% (1,368) | 5 |
+| `season` | Season suggested by the clothing and the surroundings. 'Unclear' if they give no indication. | 75.2% (1,037) | 4 |
+| `weather` | Weather visible in the photos. 'Not visible' for indoor photos and whenever sky or conditions cannot be seen. | 25.7% (355) | 3 |
+| `hair_length` | Hair length of the person. | 93.8% (1,293) | 4 |
+| `hair_texture` | Hair texture of the person. | 92.2% (1,272) | 4 |
+| `hair_style_type` | How the hair is worn. | 94.1% (1,298) | 7 |
+| `hair_color` | Hair color of the person. | 92.9% (1,281) | 7 |
+| `hair_parting` | How the hair is parted. | 89.8% (1,239) | 4 |
+| `hair_finish` | Styling finish of the hair. | 92.2% (1,272) | 5 |
+| `makeup_style` | Makeup style of the person. | 87.5% (1,206) | 4 |
+| `brand_mentions` | Brands of this outfit that are named in the post title, text, tags, image captions or link texts. Do not infer brands from appearance. Empty list if none. | 51.3% (708) | 393 |
+| `price_segment` | Price segment suggested by the named brands or the text. 'Unknown' without such evidence. | 37.7% (520) | 3 |
+| `record_id` | Stable id derived from the post URL, the image hashes and the position of the outfit in the post. | 100.0% (1,379) | 1,379 |
+| `schema_version` | Version of the record schema. | 100.0% (1,379) | 1 |
+| `model` | Gemini model that produced the record. | 100.0% (1,379) | 3 |
+| `extraction_hash` | Hash of the prompt, response schema, model settings and image preprocessing. Records with the same hash were extracted under the same conditions. | 100.0% (1,379) | 8 |
+| `date_scraped` | UTC date of the extraction (YYYY-MM-DD). | 100.0% (1,379) | 13 |
+| `published_date` | Publish date of the post from its feed (YYYY-MM-DD). | 100.0% (1,379) | 68 |
+| `source_id` | Domain of the blog, without www. | 100.0% (1,379) | 48 |
+| `source_country` | ISO 3166-1 alpha-2 country of the blog. Null if unknown. | 98.7% (1,361) | 8 |
+| `source_country_basis` | How the country was determined: model (Gemini with web search), domain (country-code top-level domain), feed_language (region of the RSS language tag) or unknown. | 100.0% (1,379) | 3 |
+| `source_region` | Region derived from source_country. | 98.7% (1,361) | 4 |
+| `source_language` | Language of the blog from its feed (ISO 639-1). | 100.0% (1,379) | 3 |
+| `post_url` | URL of the post. | 100.0% (1,379) | 354 |
+| `canonical_url` | Canonical URL declared by the post page. | 56.3% (776) | 180 |
+| `post_title` | Title of the post. | 100.0% (1,379) | 354 |
+| `post_tags` | Categories and tags of the post from its feed. | 99.3% (1,370) | 848 |
+| `shopping_link_count` | Number of links to shops or affiliate networks in the post. | 100.0% (1,379) | 44 |
+| `outfit_colors` | Primary colors of the clothing and footwear, in the order of the garments list. | 98.7% (1,361) | 21 |
 
 **Garments**
 
 | Category | Items | Outfits with this category |
 |---|---|---|
-| Top | 1,063 | 73.5% (950) |
-| Bottom | 933 | 71.9% (929) |
-| Dress/One-piece | 223 | 17.3% (223) |
-| Outerwear | 439 | 33.2% (429) |
-| Footwear | 847 | 65.6% (847) |
-| Bag | 426 | 32.6% (421) |
-| Headwear | 90 | 7.0% (90) |
-| Eyewear | 270 | 20.8% (269) |
-| Jewelry | 972 | 44.2% (571) |
-| Belt | 172 | 13.2% (171) |
-| Scarf/Neckwear | 111 | 8.6% (111) |
-| Hair accessory | 24 | 1.9% (24) |
-| Hosiery | 73 | 5.4% (70) |
-| Other | 127 | 8.0% (103) |
+| Top | 1,131 | 73.5% (1,014) |
+| Bottom | 995 | 71.9% (991) |
+| Dress/One-piece | 235 | 17.0% (235) |
+| Outerwear | 487 | 34.4% (474) |
+| Footwear | 907 | 65.8% (907) |
+| Bag | 451 | 32.3% (446) |
+| Headwear | 96 | 7.0% (96) |
+| Eyewear | 293 | 21.2% (292) |
+| Jewelry | 1,018 | 44.0% (607) |
+| Belt | 178 | 12.8% (177) |
+| Scarf/Neckwear | 128 | 9.3% (128) |
+| Hair accessory | 25 | 1.8% (25) |
+| Hosiery | 76 | 5.3% (73) |
+| Other | 131 | 7.8% (107) |
 
-Most frequent garment types: Trousers (376), Jeans (295), Earrings (269), Necklace (254), T-shirt (238), Dress (218), Sweater (217), Button-up shirt (204), Heels/Pumps (181), Bracelet (176), Belt (172), Skirt (167), Ankle boots (159), Ring (159), Sunglasses (156).
+Most frequent garment types: Trousers (415), Jeans (307), Earrings (282), Necklace (266), T-shirt (253), Sweater (235), Dress (230), Button-up shirt (223), Heels/Pumps (197), Bracelet (183), Belt (178), Skirt (176), Ankle boots (168), Ring (168), Sunglasses (162).
 <!-- DATASET_OVERVIEW_END -->
 
 ## Pipeline Architecture
