@@ -9,6 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
+# Model of the requests with Google Search (weekly source discovery, monthly vocabulary review). In November 2026
+# gemini-3.8-flash took two to five minutes per grounded request and often rejected requests for high demand;
+# gemini-3.5-flash-lite answered grounded requests in 20 to 60 seconds.
+DEFAULT_GEMINI_SEARCH_MODEL = "gemini-3.5-flash-lite"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -56,7 +60,9 @@ class Settings:
     """Settings that can be changed per run without code changes.
 
     Attributes:
-        gemini_model (str): Gemini model id used for extraction.
+        gemini_model (str): Gemini model id used for extraction; stored in every record.
+        gemini_search_model (str): Gemini model id used for the requests with Google Search
+            (source discovery and vocabulary review).
         max_images_per_post (int): Maximum number of images sent to Gemini per post.
         max_gemini_calls_per_run (int): Upper bound for Gemini calls in one run,
             including retries.
@@ -69,6 +75,7 @@ class Settings:
         output_dir (Path): Folder for records (``YYYY/MM/``) and state (``state/``).
     """
     gemini_model: str = DEFAULT_GEMINI_MODEL
+    gemini_search_model: str = DEFAULT_GEMINI_SEARCH_MODEL
     max_images_per_post: int = 8
     max_gemini_calls_per_run: int = 50
     max_posts_per_run: int = 40
@@ -91,6 +98,7 @@ class Settings:
         """
         return cls(
             gemini_model=os.getenv("GEMINI_MODEL", "").strip() or DEFAULT_GEMINI_MODEL,
+            gemini_search_model=os.getenv("GEMINI_SEARCH_MODEL", "").strip() or DEFAULT_GEMINI_SEARCH_MODEL,
             max_images_per_post=_env_int("MAX_IMAGES_PER_POST", cls.max_images_per_post),
             max_gemini_calls_per_run=_env_int("MAX_GEMINI_CALLS_PER_RUN", cls.max_gemini_calls_per_run),
             max_posts_per_run=_env_int("MAX_POSTS_PER_RUN", cls.max_posts_per_run),

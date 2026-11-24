@@ -68,7 +68,9 @@ dataset.fashion/
 2. Ask Gemini with Google Search for the country and language of sources whose country was so far inferred only from the domain or the feed language (20 domains per request).
 3. Ask Gemini with Google Search for new personal style blogs, in up to 4 searches with successive focuses, starting with the focus of the week. A search without results does not end the discovery. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week, and the searches end once that number is reached.
 
-Each request with Google Search takes up to five minutes, the server deadline of the Gemini API, and is retried once after a timeout or server error (`SEARCH_RETRY_ATTEMPTS`). After 20 minutes (`MAINTENANCE_DEADLINE_MINUTES`) no further request is started; the run stops with `stopped_early` in the run log and keeps what it found. The run log records the seconds of every request (`gemini_seconds`, and `seconds` per search).
+The requests with Google Search use `gemini-3.5-flash-lite` (`GEMINI_SEARCH_MODEL`), not the extraction model: in November 2026, `gemini-3.8-flash` took two to five minutes per grounded request and often rejected requests for high demand, while `gemini-3.5-flash-lite` answered in 20 to 60 seconds. The thinking level is set to `MEDIUM`, as lower levels can end the searches early.
+
+A request ends at the latest at the server deadline of the Gemini API (five minutes). An overloaded model (503) or a gateway error is retried after about 10 and 20 seconds (`SEARCH_RETRY_ATTEMPTS`, `SEARCH_RETRY_STATUS_CODES`); a request that ran into the server deadline (504) is not retried, as the retry would take as long again. The client timeout of 5.5 minutes lies above the server deadline, because the SDK retries client timeouts in any case. After 20 minutes (`MAINTENANCE_DEADLINE_MINUTES`) no further request is started; the run stops with `stopped_early` in the run log and keeps what it found. The run log records the model (`gemini_model`) and the seconds of every request (`gemini_seconds`, and `seconds` per search).
 
 The workflow commits `data/state/`; its timeout of 45 minutes leaves room for a request that started just before the time budget ran out.
 
@@ -82,7 +84,9 @@ The workflow commits `data/state/`; its timeout of 45 minutes leaves room for a 
 2. Ask Gemini with Google Search, in one request per group of lists, for missing established or emerging terms and for values that are no longer in use, with the data as hints. Check each proposal: known list and action, no existing or retired value, an active parent, a garment category for garment types, sources from at least two domains, at most three proposals per list.
 3. Append the valid additions to their lists (`added` = day of the review) and to the change log in the README, and write the report: additions, proposed retirements, frequent unlisted terms that were not added, dominant and unused values, shares of the catch-all values, and the rejected proposals.
 
-The workflow opens or updates a pull request on the branch `vocabulary-review`, which is rebuilt every month, and starts the CI workflow on it. A quota or API error ends the research; the pull request is opened with what was found, and the workflow fails visibly.
+The research uses the search model and the retry rules of the weekly run (section 3). After 20 minutes (`REVIEW_DEADLINE_MINUTES`) no further request is started; the report names the model and the seconds of every request.
+
+The workflow opens or updates a pull request on the branch `vocabulary-review`, which is rebuilt every month, and starts the CI workflow on it. A quota or API error or the time budget ends the research; the pull request is opened with what was found, and the workflow fails visibly. Its timeout of 45 minutes leaves room for a request that started just before the time budget ran out.
 
 ---
 

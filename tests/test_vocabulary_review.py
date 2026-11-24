@@ -51,6 +51,8 @@ class FakeModel:
         self.answers = answers
         self.prompts: list[str] = []
         self.fail_after = fail_after
+        self.model: Optional[str] = None
+        self.durations: list[float] = []
 
     def ask(self, prompt: str) -> SearchAnswer:
         if self.fail_after is not None and len(self.prompts) >= self.fail_after:
@@ -204,6 +206,19 @@ def test_report_lists_additions_retirements_terms_and_usage(tmp_path: Path) -> N
     assert "| `hair_finish` | Wet look | Rare. |" in report
     assert "| `material` | Mesh | 60 | 4 |" in report
     assert "- `hair_style_type`: Down covers 100% of the observations" in report
+
+
+def test_report_names_the_model_and_the_seconds_of_every_request(tmp_path: Path) -> None:
+    model = FakeModel({}, fail_after=3)
+    model.model = "search-model"
+    model.durations = [41.5, 37.0, 52.25]
+
+    result, signals = review(tmp_path, TODAY, model)
+    report = build_report(result, signals, VOCABULARIES, TODAY, research_enabled=True)
+
+    assert (result.research_model, result.research_seconds) == ("search-model", [41.5, 37.0, 52.25])
+    assert ("3 research requests with Google Search (`search-model`; seconds per request: 41.5, 37, 52.25); "
+            "the research stopped early") in report
 
 
 def test_main_without_research_writes_only_the_report(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -63,6 +63,8 @@ MAX_VALUE_CHARS = 40
 # A value with this share of the observations of its list is reported as a candidate for a split
 DOMINANT_SHARE = 0.6
 MIN_OBSERVATIONS = 50
+# No research request is started after this time, so that the pull request is opened before the workflow timeout
+REVIEW_DEADLINE_MINUTES = 20
 # Values that mark absence; they are left out of the shares
 ABSENCE_VALUES = frozenset({"Not visible", "Not applicable"})
 CATCH_ALL_VALUES = ("Other", "Other jacket", "Unclear")
@@ -191,12 +193,16 @@ class ReviewResult:
         rejected (list[tuple[Proposal, str]]): Research proposals that failed a rule, with the reason.
         research_requests (int): Requests sent to Gemini.
         research_error (Optional[str]): Why the research stopped early, if it did.
+        research_model (Optional[str]): Gemini model id of the research, if known.
+        research_seconds (list[float]): Seconds per research request, including failed ones.
     """
     additions: list[Addition] = field(default_factory=list)
     retirements: list[Proposal] = field(default_factory=list)
     rejected: list[tuple[Proposal, str]] = field(default_factory=list)
     research_requests: int = 0
     research_error: Optional[str] = None
+    research_model: Optional[str] = None
+    research_seconds: list[float] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -562,6 +568,11 @@ def build_report(result: ReviewResult, signals: DataSignals, vocabularies: dict[
     lines = [f"# Vocabulary review {today:%Y-%m}", ""]
     research_state = (f"{result.research_requests} research requests with Google Search" if research_enabled
                       else "research turned off")
+    details = [f"`{result.research_model}`"] if result.research_model else []
+    if result.research_seconds:
+        details.append("seconds per request: " + ", ".join(f"{seconds:g}" for seconds in result.research_seconds))
+    if research_enabled and details:
+        research_state += f" ({'; '.join(details)})"
     if result.research_error:
         research_state += f"; the research stopped early ({_cell(result.research_error)})"
     lines.append(f"Reviewed {len(REVIEWED_LISTS)} lists against {signals.records} records of "
@@ -642,7 +653,9 @@ def review(data_dir: Path, today: date, model: Optional[Any], vocabularies: dict
     signals = collect_signals(load_window(data_dir, today))
     result = ReviewResult()
     if model is not None:
+        result.research_model = getattr(model, "model", None)
         research(model, vocabularies, signals, today, result)
+        result.research_seconds = list(getattr(model, "durations", []))
     return result, signals
 
 
@@ -667,7 +680,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     model = None
     if not args.no_research:
         try:
-            model = SearchModel(settings)
+            model = SearchModel(settings, deadline_s=REVIEW_DEADLINE_MINUTES * 60)
         except ValueError as e:
             logger.error("Cannot start the vocabulary research: %s", e)
             return 2

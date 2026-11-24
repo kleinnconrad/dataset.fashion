@@ -10,7 +10,10 @@ from google.genai import errors, types
 
 import discovery as discovery_module
 from discovery import (
+    SEARCH_REQUEST_TIMEOUT_MS,
     SEARCH_RETRY_ATTEMPTS,
+    SEARCH_RETRY_INITIAL_DELAY_S,
+    SEARCH_RETRY_STATUS_CODES,
     DeadlineReachedError,
     SearchAnswer,
     SearchModel,
@@ -22,8 +25,14 @@ from discovery import (
     weekly_focus,
     weekly_maintenance,
 )
-from extraction import CallBudgetExceededError, FatalRequestError, QuotaExhaustedError, TransientExtractionError
-from settings import Settings
+from extraction import (
+    CallBudgetExceededError,
+    FatalRequestError,
+    QuotaExhaustedError,
+    TransientExtractionError,
+    create_client,
+)
+from settings import DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_SEARCH_MODEL, Settings
 from sources import SourceEntry, SourceRegistry
 from state import RUN_LOG_FILE
 
@@ -283,9 +292,11 @@ class FakeClient:
         self.models = SimpleNamespace(generate_content=self.generate_content)
         self.outcome = outcome
         self.configs: list[Any] = []
+        self.model_ids: list[str] = []
 
     def generate_content(self, *, model: str, contents: str, config: Any) -> Any:
         self.configs.append(config)
+        self.model_ids.append(model)
         if isinstance(self.outcome, Exception):
             raise self.outcome
         return SimpleNamespace(text=self.outcome)
@@ -331,6 +342,7 @@ class TimedFakeSearchModel(FakeSearchModel):
 
     def __init__(self, answers: list[Any], seconds: float) -> None:
         super().__init__(answers)
+        self.model = "fake-model"
         self.durations: list[float] = []
         self.seconds = seconds
 
@@ -364,7 +376,7 @@ def test_search_model_starts_no_request_after_the_time_budget() -> None:
     model.ask("first")
     model.ask("second")
     model.ask("third")
-    with pytest.raises(DeadlineReachedError):
+    with pytest.raises(DeadlineReachedError, match="time budget of 10 minutes used up"):
         model.ask("fourth")
 
     assert model.calls == 3 and model.durations == [250.0, 250.0, 250.0] and model.last_seconds == 250.0
@@ -381,13 +393,49 @@ def test_search_model_records_the_duration_of_failed_requests() -> None:
     assert model.durations == [300.0]
 
 
-def test_search_requests_are_retried_once(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_search_requests_use_the_search_model() -> None:
+    client = FakeClient("[]")
+    model = SearchModel(Settings(gemini_model="extraction-model", gemini_search_model="search-model"), client=client,
+                        sleep=lambda s: None)
+
+    model.ask("prompt")
+
+    assert model.model == "search-model" and client.model_ids == ["search-model"]
+
+
+def test_the_search_model_is_set_separately_from_the_extraction_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_SEARCH_MODEL", raising=False)
+    assert (Settings.from_env().gemini_model, Settings.from_env().gemini_search_model) == (
+        DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_SEARCH_MODEL) == ("gemini-3.8-flash", "gemini-3.5-flash-lite")
+
+    monkeypatch.setenv("GEMINI_SEARCH_MODEL", " other-model ")
+    assert Settings.from_env().gemini_search_model == "other-model"
+    assert Settings.from_env().gemini_model == DEFAULT_GEMINI_MODEL
+
+
+def test_overloaded_responses_are_retried_but_not_the_server_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(discovery_module, "create_client", lambda **kwargs: calls.append(kwargs) or FakeClient("[]"))
 
     SearchModel(Settings())
 
-    assert calls == [{"attempts": SEARCH_RETRY_ATTEMPTS}] and SEARCH_RETRY_ATTEMPTS == 2
+    assert calls == [{"attempts": SEARCH_RETRY_ATTEMPTS, "status_codes": SEARCH_RETRY_STATUS_CODES,
+                      "initial_delay_s": SEARCH_RETRY_INITIAL_DELAY_S, "timeout_ms": SEARCH_REQUEST_TIMEOUT_MS}]
+    assert 503 in SEARCH_RETRY_STATUS_CODES and 504 not in SEARCH_RETRY_STATUS_CODES
+    # The client timeout lies above the server deadline of five minutes
+    assert SEARCH_REQUEST_TIMEOUT_MS > 300_000
+
+
+def test_the_client_applies_the_retry_rules() -> None:
+    client = create_client(api_key="test-key", attempts=SEARCH_RETRY_ATTEMPTS, status_codes=SEARCH_RETRY_STATUS_CODES,
+                           initial_delay_s=SEARCH_RETRY_INITIAL_DELAY_S, timeout_ms=SEARCH_REQUEST_TIMEOUT_MS)
+
+    options = client._api_client._http_options
+    assert options.timeout == SEARCH_REQUEST_TIMEOUT_MS
+    assert options.retry_options.attempts == SEARCH_RETRY_ATTEMPTS
+    assert options.retry_options.http_status_codes == list(SEARCH_RETRY_STATUS_CODES)
+    assert options.retry_options.initial_delay == SEARCH_RETRY_INITIAL_DELAY_S
 
 
 def test_time_budget_stops_the_maintenance_and_keeps_its_progress(tmp_path: Path, web: Any, rss: Any) -> None:
@@ -410,7 +458,9 @@ def test_run_log_records_the_duration_of_every_request(tmp_path: Path, web: Any)
     registry_with(settings.state_dir, entry("alpha.example")).save()
     model = TimedFakeSearchModel([[{"domain": "alpha.example", "country": "AU"}], [], [], [], []], seconds=240.0)
 
+
     summary = weekly_maintenance(settings, TODAY, model, web)
 
+    assert summary["gemini_model"] == "fake-model"
     assert summary["gemini_seconds"] == [240.0] * 5
     assert [search["seconds"] for search in summary["searches"]] == [240.0] * 4

@@ -68,10 +68,17 @@ MAX_ADMISSIONS_PER_WEEK = 10
 # Searches per weekly run, each with the next focus; together with the country lookups within MAX_DISCOVERY_CALLS
 SEARCHES_PER_WEEK = 4
 # Time budget of the weekly run: no Gemini request is started after it, so that the workflow commits the registry
-# before its timeout. A search with Google Search takes up to five minutes (the server deadline of a request).
+# before its timeout. A search with Google Search ends at the latest at the server deadline of five minutes.
 MAINTENANCE_DEADLINE_MINUTES = 20
-# Attempts per search request: a request that ran into the server deadline is retried once, not three times
-SEARCH_RETRY_ATTEMPTS = 2
+# Retries of a search request. An overloaded model (503 "high demand") or a gateway error is answered within seconds
+# and is retried after about 10 and 20 seconds. A request that ran into the server deadline (504) is not retried: the
+# retry would take as long again.
+SEARCH_RETRY_ATTEMPTS = 3
+SEARCH_RETRY_STATUS_CODES = (408, 500, 502, 503)
+SEARCH_RETRY_INITIAL_DELAY_S = 10.0
+# Above the server deadline, so that a request that runs too long ends with the server's 504 and not with a client
+# timeout, which the SDK always retries
+SEARCH_REQUEST_TIMEOUT_MS = 330_000
 # Beginning of an answer that named no blog, kept in the run log
 ANSWER_EXCERPT_CHARS = 300
 RECHECK_WORKERS = 8
@@ -169,13 +176,14 @@ def _source_domains(response: Any) -> tuple[str, ...]:
 
 
 class DeadlineReachedError(RunStopError):
-    """The weekly maintenance reached its time budget; no further request is started."""
+    """The run reached its time budget; no further request is started."""
 
 
 class SearchModel:
     """Gemini with Google Search grounding, for short JSON answers.
 
     Attributes:
+        model (str): The Gemini model id (``Settings.gemini_search_model``).
         calls (int): Requests sent in this run.
         durations (list[float]): Seconds per request, in order.
     """
@@ -187,16 +195,19 @@ class SearchModel:
 
         Args:
             settings: The run settings.
-            client: A ``genai.Client`` or a compatible test double; created from GEMINI_API_KEY, with
-                SEARCH_RETRY_ATTEMPTS attempts per request, if omitted.
+            client: A ``genai.Client`` or a compatible test double; created from GEMINI_API_KEY with the
+                retry rules of the search requests (SEARCH_RETRY_*), if omitted.
             sleep: Function used to wait between calls; replaceable in tests.
             clock: Monotonic clock in seconds; replaceable in tests.
             deadline_s: Seconds after which no further request is started; None for no limit.
         """
-        self._client = client if client is not None else create_client(attempts=SEARCH_RETRY_ATTEMPTS)
-        self._model = settings.gemini_model
+        self._client = client if client is not None else create_client(
+            attempts=SEARCH_RETRY_ATTEMPTS, status_codes=SEARCH_RETRY_STATUS_CODES,
+            initial_delay_s=SEARCH_RETRY_INITIAL_DELAY_S, timeout_ms=SEARCH_REQUEST_TIMEOUT_MS)
+        self.model = settings.gemini_search_model
         self._sleep = sleep
         self._clock = clock
+        self._deadline_s = deadline_s
         self._deadline = clock() + deadline_s if deadline_s is not None else None
         self.calls = 0
         self.durations: list[float] = []
@@ -223,8 +234,7 @@ class SearchModel:
             TransientExtractionError: For server errors and network errors after the SDK retries.
         """
         if self._deadline is not None and self._clock() >= self._deadline:
-            raise DeadlineReachedError("time budget of the weekly maintenance used up "
-                                       f"({MAINTENANCE_DEADLINE_MINUTES} minutes)")
+            raise DeadlineReachedError(f"time budget of {self._deadline_s / 60:g} minutes used up")
         if self.calls >= MAX_DISCOVERY_CALLS:
             raise CallBudgetExceededError(f"MAX_DISCOVERY_CALLS ({MAX_DISCOVERY_CALLS}) reached")
         if self.calls:
@@ -237,7 +247,7 @@ class SearchModel:
         )
         started = self._clock()
         try:
-            response = self._client.models.generate_content(model=self._model, contents=prompt, config=config)
+            response = self._client.models.generate_content(model=self.model, contents=prompt, config=config)
         except errors.ClientError as e:
             if e.code == 429:
                 raise QuotaExhaustedError(f"Gemini quota exhausted: {e.message}") from e
@@ -614,6 +624,8 @@ def weekly_maintenance(settings: Settings, today: date, model: Any, fetch: Fetch
     summary["searches"] = searches
     registry.save()
     summary["gemini_calls"] = model.calls
+    if getattr(model, "model", None):
+        summary["gemini_model"] = model.model
     if getattr(model, "durations", None):
         summary["gemini_seconds"] = list(model.durations)
     summary["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
