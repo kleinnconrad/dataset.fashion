@@ -10,6 +10,8 @@ from google.genai import errors, types
 
 import discovery as discovery_module
 from discovery import (
+    SEARCH_RETRY_ATTEMPTS,
+    DeadlineReachedError,
     SearchAnswer,
     SearchModel,
     discover_sources,
@@ -322,3 +324,93 @@ def test_search_model_sets_a_thinking_level_and_no_temperature() -> None:
 
     assert client.configs[0].thinking_config.thinking_level == types.ThinkingLevel.MEDIUM
     assert client.configs[0].temperature is None
+
+
+class TimedFakeSearchModel(FakeSearchModel):
+    """FakeSearchModel that reports a fixed duration per request, like SearchModel."""
+
+    def __init__(self, answers: list[Any], seconds: float) -> None:
+        super().__init__(answers)
+        self.durations: list[float] = []
+        self.seconds = seconds
+
+    @property
+    def last_seconds(self) -> Any:
+        return self.durations[-1] if self.durations else None
+
+    def ask(self, prompt: str) -> SearchAnswer:
+        self.durations.append(self.seconds)
+        return super().ask(prompt)
+
+
+class SlowClient(FakeClient):
+    """FakeClient whose requests advance a clock."""
+
+    def __init__(self, outcome: Any, now: list[float], seconds: float) -> None:
+        super().__init__(outcome)
+        self.now = now
+        self.seconds = seconds
+
+    def generate_content(self, *, model: str, contents: str, config: Any) -> Any:
+        self.now[0] += self.seconds
+        return super().generate_content(model=model, contents=contents, config=config)
+
+
+def test_search_model_starts_no_request_after_the_time_budget() -> None:
+    now = [0.0]
+    model = SearchModel(Settings(), client=SlowClient("[]", now, 250.0), sleep=lambda s: None,
+                        clock=lambda: now[0], deadline_s=600)
+
+    model.ask("first")
+    model.ask("second")
+    model.ask("third")
+    with pytest.raises(DeadlineReachedError):
+        model.ask("fourth")
+
+    assert model.calls == 3 and model.durations == [250.0, 250.0, 250.0] and model.last_seconds == 250.0
+
+
+def test_search_model_records_the_duration_of_failed_requests() -> None:
+    now = [0.0]
+    error = errors.ServerError(504, {"error": {"code": 504, "message": "Deadline", "status": "DEADLINE_EXCEEDED"}})
+    model = SearchModel(Settings(), client=SlowClient(error, now, 300.0), sleep=lambda s: None, clock=lambda: now[0])
+
+    with pytest.raises(TransientExtractionError):
+        model.ask("prompt")
+
+    assert model.durations == [300.0]
+
+
+def test_search_requests_are_retried_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(discovery_module, "create_client", lambda **kwargs: calls.append(kwargs) or FakeClient("[]"))
+
+    SearchModel(Settings())
+
+    assert calls == [{"attempts": SEARCH_RETRY_ATTEMPTS}] and SEARCH_RETRY_ATTEMPTS == 2
+
+
+def test_time_budget_stops_the_maintenance_and_keeps_its_progress(tmp_path: Path, web: Any, rss: Any) -> None:
+    settings = Settings(output_dir=tmp_path)
+    registry_with(settings.state_dir, entry("sleepy.example", status="dormant", previous_status="active")).save()
+    web.add_feed("https://sleepy.example/feed/", recent_feed(rss, "sleepy.example", [1, 3]))
+    model = FakeSearchModel([[], DeadlineReachedError("time budget used up")])
+
+    summary = weekly_maintenance(settings, TODAY, model, web)
+
+    assert summary["stopped_early"].startswith("DeadlineReachedError") and not summary["fatal"]
+    assert len(summary["searches"]) == 1
+    assert SourceRegistry.load(settings.state_dir).get("sleepy.example").status == "active"
+    log = (settings.state_dir / RUN_LOG_FILE).read_text(encoding="utf-8").splitlines()
+    assert json.loads(log[-1])["stopped_early"].startswith("DeadlineReachedError")
+
+
+def test_run_log_records_the_duration_of_every_request(tmp_path: Path, web: Any) -> None:
+    settings = Settings(output_dir=tmp_path)
+    registry_with(settings.state_dir, entry("alpha.example")).save()
+    model = TimedFakeSearchModel([[{"domain": "alpha.example", "country": "AU"}], [], [], [], []], seconds=240.0)
+
+    summary = weekly_maintenance(settings, TODAY, model, web)
+
+    assert summary["gemini_seconds"] == [240.0] * 5
+    assert [search["seconds"] for search in summary["searches"]] == [240.0] * 4

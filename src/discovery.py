@@ -67,6 +67,11 @@ CANDIDATES_PER_SEARCH = 15
 MAX_ADMISSIONS_PER_WEEK = 10
 # Searches per weekly run, each with the next focus; together with the country lookups within MAX_DISCOVERY_CALLS
 SEARCHES_PER_WEEK = 4
+# Time budget of the weekly run: no Gemini request is started after it, so that the workflow commits the registry
+# before its timeout. A search with Google Search takes up to five minutes (the server deadline of a request).
+MAINTENANCE_DEADLINE_MINUTES = 20
+# Attempts per search request: a request that ran into the server deadline is retried once, not three times
+SEARCH_RETRY_ATTEMPTS = 2
 # Beginning of an answer that named no blog, kept in the run log
 ANSWER_EXCERPT_CHARS = 300
 RECHECK_WORKERS = 8
@@ -163,26 +168,43 @@ def _source_domains(response: Any) -> tuple[str, ...]:
     return tuple(domains)
 
 
+class DeadlineReachedError(RunStopError):
+    """The weekly maintenance reached its time budget; no further request is started."""
+
+
 class SearchModel:
     """Gemini with Google Search grounding, for short JSON answers.
 
     Attributes:
         calls (int): Requests sent in this run.
+        durations (list[float]): Seconds per request, in order.
     """
 
     def __init__(self, settings: Settings, client: Optional[Any] = None,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+                 deadline_s: Optional[float] = None) -> None:
         """Initializes the model.
 
         Args:
             settings: The run settings.
-            client: A ``genai.Client`` or a compatible test double; created from GEMINI_API_KEY if omitted.
+            client: A ``genai.Client`` or a compatible test double; created from GEMINI_API_KEY, with
+                SEARCH_RETRY_ATTEMPTS attempts per request, if omitted.
             sleep: Function used to wait between calls; replaceable in tests.
+            clock: Monotonic clock in seconds; replaceable in tests.
+            deadline_s: Seconds after which no further request is started; None for no limit.
         """
-        self._client = client if client is not None else create_client()
+        self._client = client if client is not None else create_client(attempts=SEARCH_RETRY_ATTEMPTS)
         self._model = settings.gemini_model
         self._sleep = sleep
+        self._clock = clock
+        self._deadline = clock() + deadline_s if deadline_s is not None else None
         self.calls = 0
+        self.durations: list[float] = []
+
+    @property
+    def last_seconds(self) -> Optional[float]:
+        """Duration of the latest request in seconds, or None before the first one."""
+        return self.durations[-1] if self.durations else None
 
     def ask(self, prompt: str) -> SearchAnswer:
         """Sends a prompt with Google Search enabled.
@@ -194,11 +216,15 @@ class SearchModel:
             SearchAnswer: The answer text and the domains of its search sources.
 
         Raises:
+            DeadlineReachedError: If the time budget of the run is used up.
             CallBudgetExceededError: After MAX_DISCOVERY_CALLS calls.
             QuotaExhaustedError: For 429 responses.
             FatalRequestError: For other client errors.
             TransientExtractionError: For server errors and network errors after the SDK retries.
         """
+        if self._deadline is not None and self._clock() >= self._deadline:
+            raise DeadlineReachedError("time budget of the weekly maintenance used up "
+                                       f"({MAINTENANCE_DEADLINE_MINUTES} minutes)")
         if self.calls >= MAX_DISCOVERY_CALLS:
             raise CallBudgetExceededError(f"MAX_DISCOVERY_CALLS ({MAX_DISCOVERY_CALLS}) reached")
         if self.calls:
@@ -209,6 +235,7 @@ class SearchModel:
             thinking_config=types.ThinkingConfig(thinking_level=SEARCH_THINKING_LEVEL),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
+        started = self._clock()
         try:
             response = self._client.models.generate_content(model=self._model, contents=prompt, config=config)
         except errors.ClientError as e:
@@ -219,6 +246,8 @@ class SearchModel:
             raise TransientExtractionError(f"Gemini server error after retries: {e}") from e
         except httpx.TransportError as e:
             raise TransientExtractionError(f"Network error after retries: {e!r}") from e
+        finally:
+            self.durations.append(round(self._clock() - started, 1))
         return SearchAnswer(text=getattr(response, "text", None) or "", source_domains=_source_domains(response))
 
 
@@ -478,10 +507,16 @@ def _search(registry: SourceRegistry, model: Any, today: date, fetch: Fetcher, f
     try:
         answer = model.ask(prompt)
     except TransientExtractionError as e:
+        if getattr(model, "last_seconds", None) is not None:
+            report["seconds"] = model.last_seconds
         logger.warning("Discovery search failed (%s): %s", focus, e)
         summary["no answer"] += 1
         report["error"] = str(e)[:ANSWER_EXCERPT_CHARS]
         return 0
+    seconds = getattr(model, "last_seconds", None)
+    if seconds is not None:
+        report["seconds"] = seconds
+        logger.info("Discovery search (%s) answered in %.0f s.", focus, seconds)
     candidates: list[CandidateAnswer] = []
     try:
         candidates = parse_answers(answer.text, CandidateAnswer)
@@ -579,6 +614,8 @@ def weekly_maintenance(settings: Settings, today: date, model: Any, fetch: Fetch
     summary["searches"] = searches
     registry.save()
     summary["gemini_calls"] = model.calls
+    if getattr(model, "durations", None):
+        summary["gemini_seconds"] = list(model.durations)
     summary["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     append_run_log(settings.state_dir, summary)
     return summary
@@ -603,7 +640,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.output_dir is not None:
         settings = replace(settings, output_dir=args.output_dir)
     try:
-        model = SearchModel(settings)
+        model = SearchModel(settings, deadline_s=MAINTENANCE_DEADLINE_MINUTES * 60)
     except ValueError as e:
         logger.error("Cannot start the weekly maintenance: %s", e)
         return 2

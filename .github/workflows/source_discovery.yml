@@ -22,7 +22,9 @@ concurrency:
 jobs:
   maintain-sources:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    # The maintenance starts no Gemini request after 20 minutes (MAINTENANCE_DEADLINE_MINUTES); a request that
+    # started before takes at most two attempts of five minutes, so that the registry is committed before the timeout
+    timeout-minutes: 45
     permissions:
       contents: write
     env:

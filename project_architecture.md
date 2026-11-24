@@ -68,7 +68,9 @@ dataset.fashion/
 2. Ask Gemini with Google Search for the country and language of sources whose country was so far inferred only from the domain or the feed language (20 domains per request).
 3. Ask Gemini with Google Search for new personal style blogs, in up to 4 searches with successive focuses, starting with the focus of the week. A search without results does not end the discovery. Evaluate each candidate with the admission rules and store it with its status; at most 10 are admitted per week, and the searches end once that number is reached.
 
-The workflow commits `data/state/`.
+Each request with Google Search takes up to five minutes, the server deadline of the Gemini API, and is retried once after a timeout or server error (`SEARCH_RETRY_ATTEMPTS`). After 20 minutes (`MAINTENANCE_DEADLINE_MINUTES`) no further request is started; the run stops with `stopped_early` in the run log and keeps what it found. The run log records the seconds of every request (`gemini_seconds`, and `seconds` per search).
+
+The workflow commits `data/state/`; its timeout of 45 minutes leaves room for a request that started just before the time budget ran out.
 
 ---
 
