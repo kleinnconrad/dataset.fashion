@@ -225,6 +225,7 @@ The valid additions are written to `config/vocabularies.toml` (with the day of t
 | Date | List | Change |
 |---|---|---|
 | 2026-10-11 | all | Lists of schema 2.0 (35 lists, 352 values). |
+| 2026-11-24 | `aesthetic_tag` | Added "Boho chic": Boho chic has experienced a prominent high-fashion revival and widespread adoption in recent trend cycles. |
 
 ## Data and State Files
 
