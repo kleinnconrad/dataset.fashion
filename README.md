@@ -228,6 +228,14 @@ A change of the lists changes the response schema, but not `SCHEMA_VERSION`: the
 |---|---|---|
 | 2026-10-11 | all | Lists of schema 2.0 (35 lists, 352 values). |
 | 2026-11-24 | `aesthetic_tag` | Added "Boho chic": Boho chic has experienced a prominent high-fashion revival and widespread adoption in recent trend cycles. |
+| 2026-11-24 | `garment_type` | Added "Gloves": Leather and statement gloves have emerged as a major accessory trend featured prominently in recent runway collections and fashion media. |
+| 2026-11-24 | `garment_type` | Added "Headphones": Over-ear and wired headphones have become prominent style accessories and streetwear staples widely documented in recent trend reports. |
+| 2026-11-24 | `pattern` | Added "Houndstooth" (refines Plaid/Check): Houndstooth is a distinct duotone geometric check pattern that has re-emerged as a major staple in contemporary fashion collections and street style. |
+| 2026-11-24 | `finish` | Added "Washed" (refines Matte): A washed finish provides a relaxed, sun-faded, or vintage surface texture that is heavily featured across modern casual garments and denim. |
+| 2026-11-24 | `rise` | Added "Ultra high-rise" (refines High-rise): Ultra high-rise is an established term in contemporary fashion and retail for waistlines sitting significantly above the natural waist. |
+| 2026-11-24 | `aesthetic_tag` | Added "Gothic": Gothic fashion and dark romantic aesthetics have established a strong resurgence across mainstream runways and trend reports over the past year. |
+| 2026-11-24 | `hair_style_type` | Added "Hollywood waves" (refines Down): Hollywood waves are a prominent and established styling choice for hair worn down in contemporary fashion photography. |
+| 2026-11-24 | `makeup_style` | Added "Clean girl makeup" (refines Natural/Minimal): Clean girl makeup represents a distinct, polished refinement of the natural and minimal category widely documented across fashion blogs. |
 
 ## Data and State Files
 
