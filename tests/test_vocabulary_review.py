@@ -45,10 +45,12 @@ def record(source: str, number: int, hair: str = "Down", unlisted: Optional[list
 
 
 class FakeModel:
-    """Returns a fixed answer per group of lists and counts the requests."""
+    """Returns a fixed answer per group of lists, and fixed sources per term to source checks."""
 
-    def __init__(self, answers: dict[str, list[dict[str, Any]]], fail_after: Optional[int] = None) -> None:
+    def __init__(self, answers: dict[str, list[dict[str, Any]]], fail_after: Optional[int] = None,
+                 sources: Optional[dict[str, list[str]]] = None) -> None:
         self.answers = answers
+        self.sources = sources or {}
         self.prompts: list[str] = []
         self.fail_after = fail_after
         self.model: Optional[str] = None
@@ -58,6 +60,9 @@ class FakeModel:
         if self.fail_after is not None and len(self.prompts) >= self.fail_after:
             raise QuotaExhaustedError("quota exhausted")
         self.prompts.append(prompt)
+        if prompt.startswith("Use Google Search to find web pages that use each of"):
+            found = [{"value": term, "sources": urls} for term, urls in self.sources.items() if f"'{term}'" in prompt]
+            return SearchAnswer(text=json.dumps(found))
         group = next(name for name in LIST_GROUPS if f"({name})" in prompt)
         return SearchAnswer(text=json.dumps(self.answers.get(group, [])), source_domains=("vogue.com",))
 
@@ -137,7 +142,11 @@ def test_research_keeps_valid_proposals_and_rejects_the_others() -> None:
 
     research(model, VOCABULARIES, signals, TODAY, result)
 
-    assert len(model.prompts) == len(LIST_GROUPS) == result.research_requests
+    # One source check for 'Bubble braid', which breaks no other rule; it finds no further source
+    assert len(model.prompts) == len(LIST_GROUPS) + 1
+    assert (result.research_requests, result.source_checks) == (len(LIST_GROUPS), 1)
+    assert "'Bubble braid' (list hair_style_type)" in model.prompts[-1]
+    assert "'down'" not in model.prompts[-1] and "'Latte makeup'" not in model.prompts[-1]
     assert [(a.list_name, a.value, a.parent, a.category, a.data_outfits) for a in result.additions] == [
         ("garment_type", "Balaclava", None, "Headwear", 0),
         ("hair_style_type", "Space buns", "Bun/Updo", None, 1),
@@ -152,6 +161,46 @@ def test_research_keeps_valid_proposals_and_rejects_the_others() -> None:
         "Mesh": "unknown list 'material'",
         "Kilt": "garment category None is not an active category",
     }
+
+
+def test_the_source_check_adds_sources_to_proposals_with_too_few() -> None:
+    model = FakeModel({"hair and makeup": [
+        {"list": "hair_style_type", "action": "add", "value": "Bubble braid", "reason": "Braid with sections.",
+         "sources": ["https://www.vogue.com/article/bubble-braids"]},
+        {"list": "hair_style_type", "action": "add", "value": "Space buns", "parent": "Bun/Updo",
+         "sources": ["https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc", SOURCES[0]]},
+        {"list": "makeup_style", "action": "add", "value": "Soft glam", "sources": [SOURCES[0]]},
+    ]}, sources={
+        "Bubble braid": ["https://www.vogue.com/article/bubble-braids", "https://www.allure.com/story/bubble-braid"],
+        "Space buns": ["https://vertexaisearch.cloud.google.com/grounding-api-redirect/def"],
+    })
+    result = ReviewResult()
+
+    research(model, VOCABULARIES, DataSignals(), TODAY, result)
+
+    assert result.source_checks == 1 and len(model.prompts) == len(LIST_GROUPS) + 1
+    assert [(a.value, a.sources) for a in result.additions] == [
+        ("Bubble braid", ("https://www.vogue.com/article/bubble-braids", "https://www.allure.com/story/bubble-braid")),
+    ]
+    # Citation redirects do not name a page and do not count as sources
+    assert {proposal.value: reason for proposal, reason in result.rejected} == {
+        "Space buns": "sources from 1 domains, 2 required",
+        "Soft glam": "sources from 1 domains, 2 required",
+    }
+
+
+def test_an_error_in_the_source_check_keeps_the_valid_proposals_of_the_group() -> None:
+    model = FakeModel({"garment types": [
+        {"list": "garment_type", "action": "add", "value": "Balaclava", "category": "Headwear", "sources": SOURCES},
+        {"list": "garment_type", "action": "add", "value": "Corset", "category": "Top", "sources": [SOURCES[0]]},
+    ]}, fail_after=1)
+    result = ReviewResult()
+
+    research(model, VOCABULARIES, DataSignals(), TODAY, result)
+
+    assert [addition.value for addition in result.additions] == ["Balaclava"]
+    assert result.rejected[0][0].value == "Corset" and result.rejected[0][1].startswith("sources from 1 domains")
+    assert result.research_error is not None and "garment types (source check)" in result.research_error
 
 
 def test_a_quota_error_ends_the_research_with_what_was_found() -> None:
@@ -191,6 +240,7 @@ def test_report_lists_additions_retirements_terms_and_usage(tmp_path: Path) -> N
         {"list": "hair_style_type", "action": "add", "value": "Space buns", "parent": "Bun/Updo",
          "reason": "Two high buns.", "sources": SOURCES},
         {"list": "hair_finish", "action": "retire", "value": "Wet look", "reason": "Rare.", "sources": SOURCES},
+        {"list": "makeup_style", "action": "add", "value": "Soft glam", "sources": [SOURCES[0]]},
     ]})
     day_dir = tmp_path / "2026" / "11"
     day_dir.mkdir(parents=True)
@@ -201,7 +251,9 @@ def test_report_lists_additions_retirements_terms_and_usage(tmp_path: Path) -> N
     report = build_report(result, signals, VOCABULARIES, TODAY, research_enabled=True)
 
     assert signals.records == 60
-    assert "Reviewed 26 lists against 60 records of 2026-09-02 to 2026-12-01; 5 research requests" in report
+    assert ("Reviewed 26 lists against 60 records of 2026-09-02 to 2026-12-01; 5 research requests and 1 source "
+            "check with Google Search.") in report
+    assert "| `makeup_style` | add | Soft glam | sources from 1 domains, 2 required | vogue.com |" in report
     assert "| `hair_style_type` | Space buns | Bun/Updo | Two high buns. | [vogue.com](" in report
     assert "| `hair_finish` | Wet look | Rare. |" in report
     assert "| `material` | Mesh | 60 | 4 |" in report

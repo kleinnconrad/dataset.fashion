@@ -26,9 +26,10 @@ def test_repository_lists_build_the_schema() -> None:
 
 def test_every_value_of_schema_2_0_is_dated_from_its_first_records() -> None:
     entries = [entry for vocabulary in VOCABULARIES.values() for entry in vocabulary.entries]
-    assert len(entries) == 352
-    assert {entry.added for entry in entries} == {date(2026, 10, 11)}
-    assert vocabulary_version(VOCABULARIES) == date(2026, 10, 11)
+    assert len([entry for entry in entries if entry.added == date(2026, 10, 11)]) == 352
+    assert all(entry.added >= date(2026, 10, 11) for entry in entries)
+    changes = [day for entry in entries for day in (entry.added, entry.retired) if day is not None]
+    assert vocabulary_version(VOCABULARIES) == max(changes)
 
 
 def test_retired_values_stay_in_the_list_but_are_not_offered() -> None:

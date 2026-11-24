@@ -19,12 +19,14 @@ from schema import (
 
 FIXTURE = Path(__file__).parent / "fixtures" / "post_extraction.json"
 
-# sha256 of describe_models(include_descriptions=False) per schema version. A change
-# of field names, types or required flags must come with a new SCHEMA_VERSION.
+# sha256 of describe_models(include_descriptions=False, include_values=False) per schema version. A change
+# of field names, types, fixed lists or required flags must come with a new SCHEMA_VERSION. A change of the
+# values of a list is versioned by vocabulary_version, so the snapshot names the lists, not their values.
 SCHEMA_SNAPSHOTS = {
+    # 2.0: computed with the values of the lists
     "2.0": "203566060a94c0d44a71d53837d4013e961b5f2f072baa998e1413cc4cd0855a",
     # 2.1: unlisted_values (filled by the model) and vocabulary_version (records)
-    "2.1": "0d70ccbe343498c8f81ea39756a8d556830b5d4aa0126a9871f6a507b5efb27d",
+    "2.1": "641becdee9ad2ea141d67c480abb61f360ff012580274acbdf14f849efa3e028",
 }
 
 
@@ -97,7 +99,8 @@ def test_sdk_conversion_keeps_descriptions_and_enums() -> None:
 
 
 def test_schema_snapshot_matches_version() -> None:
-    current = hashlib.sha256(describe_models(include_descriptions=False).encode("utf-8")).hexdigest()
+    current = hashlib.sha256(describe_models(include_descriptions=False, include_values=False).encode("utf-8")
+                             ).hexdigest()
     assert SCHEMA_VERSION in SCHEMA_SNAPSHOTS, f"Add a snapshot for schema version {SCHEMA_VERSION}: {current}"
     assert SCHEMA_SNAPSHOTS[SCHEMA_VERSION] == current, (
         "The schema 2.x models changed. Bump SCHEMA_VERSION and add the new snapshot: " + current
@@ -107,6 +110,16 @@ def test_schema_snapshot_matches_version() -> None:
 def test_snapshot_text_excludes_descriptions() -> None:
     assert "description=" in describe_models(include_descriptions=True)
     assert "description=" not in describe_models(include_descriptions=False)
+
+
+def test_snapshot_text_names_the_lists_and_the_extraction_hash_text_their_values() -> None:
+    snapshot = describe_models(include_descriptions=False, include_values=False)
+    assert "  hair_style_type: Vocabulary[hair_style_type] required=True" in snapshot
+    assert "  secondary_color: Vocabulary[base_color,'Not applicable'] required=True" in snapshot
+    assert "  aesthetic_tags: list[Vocabulary[aesthetic_tag]] required=True" in snapshot
+    assert "'Ponytail'" not in snapshot
+    assert "Literal['model','domain','feed_language','unknown']" in snapshot
+    assert "'Ponytail'" in describe_models(include_descriptions=True)
 
 
 @pytest.mark.parametrize(
