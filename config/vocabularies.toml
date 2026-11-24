@@ -109,6 +109,8 @@ values = [
     { value = "Tights", category = "Hosiery", added = 2026-10-11 },
     { value = "Socks", category = "Hosiery", added = 2026-10-11 },
     { value = "Other", category = "Other", added = 2026-10-11 },
+    { value = "Gloves", category = "Other", added = 2026-11-24 },
+    { value = "Headphones", category = "Other", added = 2026-11-24 },
 ]
 
 # Used by: primary_color, secondary_color, outfit_colors
@@ -153,6 +155,7 @@ values = [
     { value = "Logo/Text", added = 2026-10-11 },
     { value = "Other", added = 2026-10-11 },
     { value = "Not applicable", added = 2026-10-11 },
+    { value = "Houndstooth", added = 2026-11-24, parent = "Plaid/Check" },
 ]
 
 # Used by: material
@@ -231,6 +234,7 @@ values = [
     { value = "Low-rise", added = 2026-10-11 },
     { value = "Not visible", added = 2026-10-11 },
     { value = "Not applicable", added = 2026-10-11 },
+    { value = "Ultra high-rise", added = 2026-11-24, parent = "High-rise" },
 ]
 
 # Used by: leg_shape
@@ -254,6 +258,7 @@ values = [
     { value = "Metallic", added = 2026-10-11 },
     { value = "Sheer", added = 2026-10-11 },
     { value = "Not applicable", added = 2026-10-11 },
+    { value = "Washed", added = 2026-11-24, parent = "Matte" },
 ]
 
 # Used by: design_details
@@ -353,6 +358,7 @@ values = [
     { value = "Coquette", added = 2026-10-11 },
     { value = "Clean girl", added = 2026-10-11 },
     { value = "Boho chic", added = 2026-11-24 },
+    { value = "Gothic", added = 2026-11-24 },
 ]
 
 # Used by: overall_fit
@@ -476,6 +482,7 @@ values = [
     { value = "Slicked back", added = 2026-10-11 },
     { value = "Covered", added = 2026-10-11 },
     { value = "Not visible", added = 2026-10-11 },
+    { value = "Hollywood waves", added = 2026-11-24, parent = "Down" },
 ]
 
 # Used by: hair_color
@@ -521,6 +528,7 @@ values = [
     { value = "Bold eyes", added = 2026-10-11 },
     { value = "Full glam", added = 2026-10-11 },
     { value = "Not visible", added = 2026-10-11 },
+    { value = "Clean girl makeup", added = 2026-11-24, parent = "Natural/Minimal" },
 ]
 
 # Used by: price_segment
