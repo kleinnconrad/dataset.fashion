@@ -352,6 +352,7 @@ values = [
     { value = "Tomboy", added = 2026-10-11 },
     { value = "Coquette", added = 2026-10-11 },
     { value = "Clean girl", added = 2026-10-11 },
+    { value = "Boho chic", added = 2026-11-24 },
 ]
 
 # Used by: overall_fit
