@@ -212,7 +212,9 @@ class ExtractionResult:
     split: bool = False
 
 
-def create_client(api_key: Optional[str] = None) -> genai.Client:
+def create_client(api_key: Optional[str] = None, attempts: int = SDK_RETRY_ATTEMPTS,
+                  status_codes: Sequence[int] = tuple(SDK_RETRY_STATUS_CODES),
+                  initial_delay_s: Optional[float] = None, timeout_ms: int = REQUEST_TIMEOUT_MS) -> genai.Client:
     """Creates the Gemini client with timeout and retry options.
 
     The synchronous client is used on purpose: the async client sends requests
@@ -221,6 +223,11 @@ def create_client(api_key: Optional[str] = None) -> genai.Client:
 
     Args:
         api_key: API key; defaults to the GEMINI_API_KEY environment variable.
+        attempts: Attempts per request, including the first one, for timeouts and the given status codes.
+        status_codes: HTTP status codes that the SDK retries.
+        initial_delay_s: Wait before the first retry in seconds, doubled for each further retry; None for the
+            default of the SDK (one second).
+        timeout_ms: Timeout of one attempt in milliseconds. The SDK retries client timeouts in any case.
 
     Returns:
         genai.Client: The configured client.
@@ -234,10 +241,11 @@ def create_client(api_key: Optional[str] = None) -> genai.Client:
     return genai.Client(
         api_key=key,
         http_options=types.HttpOptions(
-            timeout=REQUEST_TIMEOUT_MS,
+            timeout=timeout_ms,
             retry_options=types.HttpRetryOptions(
-                attempts=SDK_RETRY_ATTEMPTS,
-                http_status_codes=SDK_RETRY_STATUS_CODES,
+                attempts=attempts,
+                http_status_codes=list(status_codes),
+                initial_delay=initial_delay_s,
             ),
         ),
     )

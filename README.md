@@ -205,7 +205,7 @@ Each record describes one outfit of one person in one post. The models are defin
 
 **Legacy records.** The records collected before the switch to schema 2.0 use schema 1.x. They were taken from blog homepages without deduplication and without publish dates, and many describe the same photos repeatedly. They remain unchanged in `data/` and are reported separately in the overview.
 
-**Model changes.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. The records of 2026-11-06 were extracted by `gemini-3.5-flash-lite`, which was replaced after this one run. Later records are extracted by `gemini-3.8-flash` (thinking level `LOW`; Gemini 3 and later models ignore custom temperatures). The fields `model` and `extraction_hash` separate the records of the three models.
+**Model changes.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. The records of 2026-11-06 were extracted by `gemini-3.5-flash-lite`, which was replaced after this one run. Later records are extracted by `gemini-3.8-flash` (thinking level `LOW`; Gemini 3 and later models ignore custom temperatures). The fields `model` and `extraction_hash` separate the records of the three models. The requests with Google Search of the source discovery and the vocabulary review write no records; from 2026-11-24 they use `gemini-3.5-flash-lite` (`GEMINI_SEARCH_MODEL`), as `gemini-3.8-flash` took two to five minutes per request.
 
 ## Vocabularies
 
@@ -262,7 +262,8 @@ Manual runs (`workflow_dispatch`) accept a `mode`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | none | API key for Gemini (required) |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Model for extraction and discovery; stored in every record. A Gemini 3 or later model: the requests set a thinking level, which Gemini 2.5 models reject |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Model for extraction; stored in every record. A Gemini 3 or later model: the requests set a thinking level, which Gemini 2.5 models reject |
+| `GEMINI_SEARCH_MODEL` | `gemini-3.5-flash-lite` | Model for the requests with Google Search (source discovery, vocabulary review). A Gemini 3 or later model that supports Grounding with Google Search |
 | `MAX_POSTS_PER_RUN` | 40 | Posts per pipeline run |
 | `MAX_POSTS_PER_SOURCE` | 3 | Posts per source and run |
 | `MAX_PROBATION_POSTS_PER_RUN` | 10 | Posts from sources on probation per run |
