@@ -18,7 +18,7 @@ from extraction import (
     UsageTotals,
 )
 from pipeline import DRY_RUN_REPORT_FILE, DailyRun, Services
-from schema import PostExtraction
+from schema import VOCABULARY_VERSION, PostExtraction
 from settings import Settings
 from sources import SourceEntry, SourceRegistry
 from state import RUN_LOG_FILE, PipelineState
@@ -135,7 +135,7 @@ def test_run_stores_records_state_and_log(setup: dict[str, Any]) -> None:
     records = stored(setup)
     assert [record["post_url"] for record in records] == POSTS
     assert {record["schema_version"] for record in records} == {"2.1"}
-    assert {record["vocabulary_version"] for record in records} == {"2026-10-11"}
+    assert {record["vocabulary_version"] for record in records} == {VOCABULARY_VERSION}
     assert all(len(record["images"]) == 2 for record in records)
     state = PipelineState.load(setup["settings"].state_dir)
     assert {entry.status for entry in state.posts.values()} == {"done"}

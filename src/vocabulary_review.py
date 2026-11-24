@@ -58,6 +58,11 @@ MIN_DATA_OUTFITS = 10
 MIN_DATA_SOURCES = 3
 # A research proposal needs sources from this many different domains
 MIN_RESEARCH_SOURCES = 2
+# A proposed addition with sources from fewer domains is searched once more for further sources, in one request per
+# group of lists, up to this number of pages per term
+MAX_CHECKED_SOURCES = 4
+# Hosts of links that do not name the source page (Gemini's citation redirects); they do not count as sources
+UNNAMED_SOURCE_HOSTS = frozenset({"vertexaisearch.cloud.google.com"})
 MAX_PROPOSALS_PER_LIST = 3
 MAX_VALUE_CHARS = 40
 # A value with this share of the observations of its list is reported as a candidate for a split
@@ -105,6 +110,20 @@ Return only a JSON array, without other text, or [] if all lists are up to date:
 "reason": "one sentence", "sources": ["https://...", "https://..."]}}]"""
 
 
+SOURCE_CHECK_PROMPT = """\
+Use Google Search to find web pages that use each of the following fashion terms in the given meaning, for example \
+in fashion magazines, trend reports, retailer category pages or fashion glossaries.
+
+Terms:
+{terms}
+
+For each term, give up to {max_sources} pages from different websites that you found in the search results, as \
+full URLs of the pages. Leave out a term if you find no such page.
+
+Return only a JSON array, without other text:
+[{{"value": "term", "sources": ["https://...", "https://..."]}}]"""
+
+
 class Proposal(BaseModel):
     """A change of a list proposed by the research."""
     list: str
@@ -113,6 +132,12 @@ class Proposal(BaseModel):
     parent: Optional[str] = None
     category: Optional[str] = None
     reason: str = ""
+    sources: list[str] = []
+
+
+class SourceAnswer(BaseModel):
+    """Further sources of a proposed term, from the source check."""
+    value: str
     sources: list[str] = []
 
 
@@ -191,7 +216,8 @@ class ReviewResult:
         additions (list[Addition]): Values added to the lists.
         retirements (list[Proposal]): Proposed retirements (reported only).
         rejected (list[tuple[Proposal, str]]): Research proposals that failed a rule, with the reason.
-        research_requests (int): Requests sent to Gemini.
+        research_requests (int): Research requests sent to Gemini, one per group of lists.
+        source_checks (int): Requests sent to Gemini for further sources of proposed additions.
         research_error (Optional[str]): Why the research stopped early, if it did.
         research_model (Optional[str]): Gemini model id of the research, if known.
         research_seconds (list[float]): Seconds per research request, including failed ones.
@@ -200,6 +226,7 @@ class ReviewResult:
     retirements: list[Proposal] = field(default_factory=list)
     rejected: list[tuple[Proposal, str]] = field(default_factory=list)
     research_requests: int = 0
+    source_checks: int = 0
     research_error: Optional[str] = None
     research_model: Optional[str] = None
     research_seconds: list[float] = field(default_factory=list)
@@ -381,14 +408,27 @@ def _domain(url: str) -> Optional[str]:
     return parts.hostname.lower().removeprefix("www.")
 
 
-def check_proposal(proposal: Proposal, allowed_lists: Sequence[str],
-                   vocabularies: dict[str, Vocabulary]) -> Optional[str]:
+def source_domains(sources: Iterable[str]) -> set[str]:
+    """Returns the domains of the source URLs that name a page, without Gemini's citation redirects.
+
+    Args:
+        sources: Source URLs of a proposal.
+
+    Returns:
+        set[str]: The domains.
+    """
+    return {domain for domain in map(_domain, sources) if domain and domain not in UNNAMED_SOURCE_HOSTS}
+
+
+def check_proposal(proposal: Proposal, allowed_lists: Sequence[str], vocabularies: dict[str, Vocabulary],
+                   check_sources: bool = True) -> Optional[str]:
     """Checks a research proposal against the rules of the lists.
 
     Args:
         proposal: The proposal.
         allowed_lists: Lists of the request that returned the proposal.
         vocabularies: All lists.
+        check_sources: False to skip the rule on the number of source domains.
 
     Returns:
         Optional[str]: The reason for rejecting the proposal, or None if it is valid.
@@ -412,18 +452,75 @@ def check_proposal(proposal: Proposal, allowed_lists: Sequence[str],
         return f"parent {proposal.parent!r} is not an active value"
     if proposal.list == "garment_type" and proposal.category not in vocabularies["garment_category"].active:
         return f"garment category {proposal.category!r} is not an active category"
-    domains = {domain for domain in map(_domain, proposal.sources) if domain}
-    if len(domains) < MIN_RESEARCH_SOURCES:
+    domains = source_domains(proposal.sources)
+    if check_sources and len(domains) < MIN_RESEARCH_SOURCES:
         return f"sources from {len(domains)} domains, {MIN_RESEARCH_SOURCES} required"
     return None
+
+
+def needs_sources(proposal: Proposal, allowed_lists: Sequence[str], vocabularies: dict[str, Vocabulary]) -> bool:
+    """True for a proposed addition that breaks no rule except the number of source domains."""
+    return (proposal.action == "add" and check_proposal(proposal, allowed_lists, vocabularies, False) is None
+            and len(source_domains(proposal.sources)) < MIN_RESEARCH_SOURCES)
+
+
+def build_source_check_prompt(proposals: Sequence[Proposal]) -> str:
+    """Builds the prompt that asks for further sources of proposed additions.
+
+    Args:
+        proposals: The proposed additions with too few sources.
+
+    Returns:
+        str: The prompt.
+    """
+    terms = []
+    for proposal in proposals:
+        reason = " ".join(proposal.reason.split())
+        terms.append(f"- {' '.join(proposal.value.split())!r} (list {proposal.list})" + (f": {reason}" if reason else ""))
+    return SOURCE_CHECK_PROMPT.format(terms="\n".join(terms), max_sources=MAX_CHECKED_SOURCES)
+
+
+def add_sources(model: Any, proposals: list[Proposal], short: Sequence[Proposal]) -> list[Proposal]:
+    """Asks Gemini with Google Search for further sources of the proposals with too few sources.
+
+    Args:
+        model: A ``SearchModel`` or a test double with ``ask(prompt)``.
+        proposals: All proposals of a research request.
+        short: The proposals of ``proposals`` that need further sources.
+
+    Returns:
+        list[Proposal]: The proposals in the same order, those of ``short`` with the sources found added.
+
+    Raises:
+        RunStopError: If the request was not sent or rejected (quota, call budget, time budget).
+        TransientExtractionError: For server and network errors after the retries.
+    """
+    answer = model.ask(build_source_check_prompt(short))
+    try:
+        found = parse_answers(answer.text, SourceAnswer)
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.warning("The source check returned no valid JSON array: %s", e)
+        return proposals
+    extra: dict[str, list[str]] = defaultdict(list)
+    for item in found:
+        extra[normalize_term(item.value)].extend(item.sources)
+    checked = {id(proposal) for proposal in short}
+    merged = []
+    for proposal in proposals:
+        more = extra.get(normalize_term(proposal.value), []) if id(proposal) in checked else []
+        sources = list(dict.fromkeys([*proposal.sources, *more]))
+        merged.append(proposal.model_copy(update={"sources": sources}) if more else proposal)
+    return merged
 
 
 def research(model: Any, vocabularies: dict[str, Vocabulary], signals: DataSignals, today: date,
              result: ReviewResult) -> None:
     """Asks Gemini with Google Search whether the reviewed lists are up to date, one request per group.
 
-    Valid additions and retirements are added to ``result``; proposals that break a rule are kept as rejected.
-    A quota or API error ends the research; the review continues with what was found.
+    Proposed additions that break no rule except the number of source domains are searched once more for
+    further sources, in one request per group. Valid additions and retirements are added to ``result``;
+    proposals that break a rule are kept as rejected. A quota or API error ends the research; the review
+    continues with what was found.
 
     Args:
         model: A ``SearchModel`` or a test double with ``ask(prompt)``.
@@ -446,32 +543,62 @@ def research(model: Any, vocabularies: dict[str, Vocabulary], signals: DataSigna
         except (ValueError, json.JSONDecodeError) as e:
             logger.warning("Vocabulary research for %s returned no valid JSON array: %s", group, e)
             continue
-        per_list: Counter[str] = Counter()
-        added: set[tuple[str, str]] = set()
-        for proposal in proposals:
-            reason = check_proposal(proposal, list_names, vocabularies)
-            if reason is None and per_list[proposal.list] >= MAX_PROPOSALS_PER_LIST:
-                reason = f"more than {MAX_PROPOSALS_PER_LIST} proposals for the list"
-            value = " ".join(proposal.value.split())
-            if reason is None and proposal.action == "add" and (proposal.list, value.casefold()) in added:
-                reason = "proposed twice"
-            if reason is not None:
-                result.rejected.append((proposal, reason))
-                continue
-            per_list[proposal.list] += 1
-            if proposal.action == "retire":
-                result.retirements.append(proposal)
-                continue
-            added.add((proposal.list, value.casefold()))
-            stats = signals.unlisted.get(proposal.list, {}).get(normalize_term(value))
-            result.additions.append(Addition(
-                list_name=proposal.list, value=value, parent=proposal.parent,
-                category=proposal.category if proposal.list == "garment_type" else None,
-                reason=" ".join(proposal.reason.split()), sources=tuple(proposal.sources),
-                data_outfits=stats.outfits if stats else 0,
-            ))
-        logger.info("Vocabulary research for %s: %d proposals, %d valid.", group, len(proposals),
-                    sum(per_list.values()))
+        error = None
+        short = [proposal for proposal in proposals if needs_sources(proposal, list_names, vocabularies)]
+        if short:
+            try:
+                proposals = add_sources(model, proposals, short)
+                result.source_checks += 1
+            except (RunStopError, TransientExtractionError) as e:
+                error = f"{group} (source check): {e}"
+        valid = _accept(proposals, list_names, vocabularies, signals, result)
+        logger.info("Vocabulary research for %s: %d proposals, %d checked for further sources, %d valid.", group,
+                    len(proposals), len(short), valid)
+        if error is not None:
+            result.research_error = error
+            logger.error("Vocabulary research stopped at %s", error)
+            return
+
+
+def _accept(proposals: Sequence[Proposal], list_names: Sequence[str], vocabularies: dict[str, Vocabulary],
+            signals: DataSignals, result: ReviewResult) -> int:
+    """Checks the proposals of one research request and adds them to the result as accepted or rejected.
+
+    Args:
+        proposals: The proposals, with the sources of the source check.
+        list_names: The lists of the request.
+        vocabularies: All lists.
+        signals: Evidence from the records.
+        result: The review result, updated in place.
+
+    Returns:
+        int: The number of valid proposals.
+    """
+    per_list: Counter[str] = Counter()
+    added: set[tuple[str, str]] = set()
+    for proposal in proposals:
+        reason = check_proposal(proposal, list_names, vocabularies)
+        if reason is None and per_list[proposal.list] >= MAX_PROPOSALS_PER_LIST:
+            reason = f"more than {MAX_PROPOSALS_PER_LIST} proposals for the list"
+        value = " ".join(proposal.value.split())
+        if reason is None and proposal.action == "add" and (proposal.list, value.casefold()) in added:
+            reason = "proposed twice"
+        if reason is not None:
+            result.rejected.append((proposal, reason))
+            continue
+        per_list[proposal.list] += 1
+        if proposal.action == "retire":
+            result.retirements.append(proposal)
+            continue
+        added.add((proposal.list, value.casefold()))
+        stats = signals.unlisted.get(proposal.list, {}).get(normalize_term(value))
+        result.additions.append(Addition(
+            list_name=proposal.list, value=value, parent=proposal.parent,
+            category=proposal.category if proposal.list == "garment_type" else None,
+            reason=" ".join(proposal.reason.split()), sources=tuple(proposal.sources),
+            data_outfits=stats.outfits if stats else 0,
+        ))
+    return sum(per_list.values())
 
 
 # ---------------------------------------------------------------------------
@@ -566,7 +693,10 @@ def build_report(result: ReviewResult, signals: DataSignals, vocabularies: dict[
     """
     window_start = today - timedelta(days=LOOKBACK_DAYS)
     lines = [f"# Vocabulary review {today:%Y-%m}", ""]
-    research_state = (f"{result.research_requests} research requests with Google Search" if research_enabled
+    checks = ""
+    if result.source_checks:
+        checks = f" and {result.source_checks} source check{'s' if result.source_checks > 1 else ''}"
+    research_state = (f"{result.research_requests} research requests{checks} with Google Search" if research_enabled
                       else "research turned off")
     details = [f"`{result.research_model}`"] if result.research_model else []
     if result.research_seconds:
@@ -625,11 +755,12 @@ def build_report(result: ReviewResult, signals: DataSignals, vocabularies: dict[
             usage_lines.append(f"- `{name}`: no observation in the window for {', '.join(map(_cell, unused))}.")
     lines += usage_lines or ["No value dominates its list, and every value was observed."]
     if result.rejected:
-        lines += ["", "## Research proposals that failed a rule", "", "| List | Action | Value | Reason |",
-                  "|---|---|---|---|"]
+        lines += ["", "## Research proposals that failed a rule", "",
+                  "| List | Action | Value | Reason | Source domains |", "|---|---|---|---|---|"]
         for proposal, reason in result.rejected:
+            domains = ", ".join(sorted(source_domains(proposal.sources))) or "none"
             lines.append(f"| `{_cell(proposal.list)}` | {_cell(proposal.action)} | {_cell(proposal.value)} | "
-                         f"{_cell(reason)} |")
+                         f"{_cell(reason)} | {_cell(domains)} |")
     return "\n".join(lines) + "\n"
 
 

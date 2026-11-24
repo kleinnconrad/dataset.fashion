@@ -244,11 +244,20 @@ SCHEMA_MODELS: tuple[type[BaseModel], ...] = (
 )
 
 
-def _describe_type(annotation: object) -> str:
+def _vocabulary_of(values: tuple[object, ...]) -> Optional[str]:
+    """Returns the name of the longest list whose active values start the given Literal values, if any."""
+    matches = [name for name, vocabulary in VOCABULARIES.items()
+               if vocabulary.active and values[:len(vocabulary.active)] == vocabulary.active]
+    return max(matches, key=lambda name: len(VOCABULARIES[name].active), default=None)
+
+
+def _describe_type(annotation: object, include_values: bool = True) -> str:
     """Returns a text form of a type annotation that is the same on all supported Python versions.
 
     Args:
         annotation: A type annotation of a model field.
+        include_values: False to describe a Literal built from a list in ``config/vocabularies.toml`` by the
+            name of the list (``Vocabulary[hair_style_type]``) instead of its values.
 
     Returns:
         str: For example ``list[Garment]`` or ``Union[NoneType,str]``.
@@ -256,25 +265,32 @@ def _describe_type(annotation: object) -> str:
     origin = typing.get_origin(annotation)
     args = typing.get_args(annotation)
     if origin is Literal:
+        name = None if include_values else _vocabulary_of(args)
+        if name is not None:
+            extra = args[len(VOCABULARIES[name].active):]
+            return "Vocabulary[" + ",".join([name, *(repr(arg) for arg in extra)]) + "]"
         return "Literal[" + ",".join(repr(arg) for arg in args) + "]"
     if origin is typing.Union or origin is types.UnionType:
-        return "Union[" + ",".join(sorted(_describe_type(arg) for arg in args)) + "]"
+        return "Union[" + ",".join(sorted(_describe_type(arg, include_values) for arg in args)) + "]"
     if origin is list:
-        return "list[" + _describe_type(args[0]) + "]"
+        return "list[" + _describe_type(args[0], include_values) + "]"
     if isinstance(annotation, type):
         return annotation.__name__
     return repr(annotation)
 
 
-def describe_models(include_descriptions: bool) -> str:
+def describe_models(include_descriptions: bool, include_values: bool = True) -> str:
     """Returns a canonical text form of the schema 2.0 models.
 
     The text lists every field with its type and whether it is required. It is
-    used for the extraction hash (with descriptions, because they are part of
-    the prompt) and for the schema snapshot test (without descriptions).
+    used for the extraction hash (with descriptions and values, because they are
+    part of the prompt) and for the schema snapshot test (without descriptions
+    and values: a change of the lists is versioned by ``vocabulary_version``,
+    not by ``SCHEMA_VERSION``).
 
     Args:
         include_descriptions: Whether to include the field descriptions.
+        include_values: Whether to list the values of the fixed lists; otherwise only the names of the lists.
 
     Returns:
         str: One line per model and per field.
@@ -283,7 +299,7 @@ def describe_models(include_descriptions: bool) -> str:
     for model in SCHEMA_MODELS:
         lines.append(model.__name__)
         for name, field in model.model_fields.items():
-            line = f"  {name}: {_describe_type(field.annotation)} required={field.is_required()}"
+            line = f"  {name}: {_describe_type(field.annotation, include_values)} required={field.is_required()}"
             if include_descriptions:
                 line += f" description={field.description!r}"
             lines.append(line)
