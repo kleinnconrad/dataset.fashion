@@ -9,6 +9,7 @@ A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in Gi
 - [Sources and Post Selection](#sources-and-post-selection)
 - [Source Lifecycle](#source-lifecycle)
 - [Record Schema 2.0](#record-schema-20)
+- [Vocabularies](#vocabularies)
 - [Data and State Files](#data-and-state-files)
 - [Workflows](#workflows)
 - [Configuration](#configuration)
@@ -198,12 +199,24 @@ Each record describes one outfit of one person in one post. The models are defin
 
 - **Outfit attributes:** framing, photo context (blogger or private person, brand campaign, editorial), gender, age group, style category and aesthetic tags, overall fit, silhouette, color palette and contrast, occasion, setting, season, weather, hair and makeup.
 - **Garments:** one entry per garment, shoe and accessory with type and derived category, description, primary and secondary color, pattern, material, fit, length, neckline, rise, leg shape, finish and design details.
-- **Fixed vocabularies:** all attributes except the free-text details use fixed lists of values. Absence is explicit: "Not visible" for attributes of the photo, "Not applicable" for garment attributes that do not apply to the item.
+- **Fixed vocabularies:** all attributes except the free-text details use fixed lists of values. Absence is explicit: "Not visible" for attributes of the photo, "Not applicable" for garment attributes that do not apply to the item. The lists and their history are kept in [config/vocabularies.toml](config/vocabularies.toml) (see [Vocabularies](#vocabularies)).
 - **Provenance:** record id, schema version, model, extraction hash (prompt, schema and model settings), scrape and publish dates, source domain, country and language, post URL, title and tags, and the dHash and size of each image. Image URLs are not stored.
 
 **Legacy records.** The records collected before the switch to schema 2.0 use schema 1.x. They were taken from blog homepages without deduplication and without publish dates, and many describe the same photos repeatedly. They remain unchanged in `data/` and are reported separately in the overview.
 
 **Model changes.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. The records of 2026-11-06 were extracted by `gemini-3.5-flash-lite`, which was replaced after this one run. Later records are extracted by `gemini-3.8-flash` (thinking level `LOW`; Gemini 3 and later models ignore custom temperatures). The fields `model` and `extraction_hash` separate the records of the three models.
+
+## Vocabularies
+
+The fixed lists of values are kept in [config/vocabularies.toml](config/vocabularies.toml), one list per attribute group (35 lists, 352 values on 2026-10-11). They are slowly changing dimensions: every value has the day from which it is offered to Gemini (`added`), and a value that is no longer offered keeps its entry with the day of its retirement (`retired`), so the file shows which values were valid at any time. `src/schema.py` builds the response schema from the active values; a change of the file therefore changes the extraction hash of the following records.
+
+- **Values are permanent.** A value is never renamed and never reused for another meaning; a changed meaning needs a new value.
+- **Splits keep the series comparable.** A value that refines an existing value names it as `parent`, so that series can be summed up to the earlier values.
+- **Every change is logged** in the table below with its date.
+
+| Date | List | Change |
+|---|---|---|
+| 2026-10-11 | all | Lists of schema 2.0 (35 lists, 352 values). |
 
 ## Data and State Files
 

@@ -4,7 +4,9 @@ Defines the Pydantic schemas for the Fashion Analytics dataset.
 Schema 2.0 separates the models that Gemini fills (``PostExtraction`` and its
 parts) from the records written to disk (``OutfitRecord``). Vocabularies are
 ``Literal`` aliases, because google-genai drops the field descriptions of
-``Enum`` classes when it builds the response schema. All fields of the models
+``Enum`` classes when it builds the response schema. Their values are the
+active values of the lists in ``config/vocabularies.toml``, which keeps the
+history of every list (see ``src/vocabularies.py``). All fields of the models
 sent to Gemini are required; absence is expressed with "Not visible",
 "Not applicable" or null.
 """
@@ -14,26 +16,16 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from vocabularies import VOCABULARIES
+
 SCHEMA_VERSION = "2.0"
 
+# The lists of values are kept with their history in config/vocabularies.toml (see src/vocabularies.py);
+# Gemini is offered the active values in the order of the file
 GARMENT_TYPES_BY_CATEGORY: dict[str, tuple[str, ...]] = {
-    "Top": ("T-shirt", "Tank top/Camisole", "Blouse", "Button-up shirt", "Polo shirt", "Sweater",
-            "Cardigan", "Sweatshirt/Hoodie", "Bodysuit", "Tunic"),
-    "Bottom": ("Jeans", "Trousers", "Leggings", "Shorts", "Skirt", "Joggers/Sweatpants"),
-    "Dress/One-piece": ("Dress", "Jumpsuit", "Romper/Playsuit", "Overalls"),
-    "Outerwear": ("Blazer", "Coat", "Trench coat", "Denim jacket", "Leather jacket", "Bomber jacket",
-                  "Puffer/Quilted jacket", "Shacket/Overshirt", "Vest/Gilet", "Cape/Poncho", "Other jacket"),
-    "Footwear": ("Sneakers", "Ankle boots", "Knee-high boots", "Loafers", "Ballet flats", "Sandals",
-                 "Heels/Pumps", "Mules/Slides", "Clogs", "Espadrilles", "Oxfords/Brogues"),
-    "Bag": ("Tote", "Shoulder bag", "Crossbody bag", "Clutch", "Backpack", "Belt bag", "Top-handle bag"),
-    "Headwear": ("Baseball cap", "Beanie", "Wide-brim hat", "Bucket hat", "Beret"),
-    "Eyewear": ("Sunglasses", "Glasses"),
-    "Jewelry": ("Necklace", "Earrings", "Bracelet", "Ring", "Watch", "Brooch"),
-    "Belt": ("Belt",),
-    "Scarf/Neckwear": ("Scarf", "Bandana", "Tie"),
-    "Hair accessory": ("Headband", "Hair clip", "Hair bow", "Scrunchie"),
-    "Hosiery": ("Tights", "Socks"),
-    "Other": ("Other",),
+    category: tuple(entry.value for entry in VOCABULARIES["garment_type"].entries
+                    if entry.active and entry.category == category)
+    for category in VOCABULARIES["garment_category"].active
 }
 GARMENT_CATEGORY_BY_TYPE: dict[str, str] = {
     garment_type: category
@@ -47,60 +39,41 @@ CLOTHING_CATEGORIES = ("Top", "Bottom", "Dress/One-piece", "Outerwear", "Footwea
 GarmentCategory = Literal[tuple(GARMENT_TYPES_BY_CATEGORY)]
 GarmentType = Literal[tuple(GARMENT_CATEGORY_BY_TYPE)]
 
-BaseColor = Literal["Black", "White", "Grey", "Beige/Cream", "Brown", "Camel/Tan", "Navy", "Blue",
-                    "Light blue", "Denim blue", "Green", "Olive", "Red", "Burgundy", "Pink", "Purple",
-                    "Yellow", "Orange", "Gold", "Silver", "Multicolor"]
+BaseColor = Literal[VOCABULARIES["base_color"].active]
 SecondaryColor = Literal[BaseColor, "Not applicable"]
-Pattern = Literal["Solid", "Striped", "Plaid/Check", "Floral", "Polka dot", "Animal print", "Abstract/Graphic",
-                  "Geometric", "Paisley", "Camouflage", "Logo/Text", "Other", "Not applicable"]
-Material = Literal["Denim", "Cotton", "Linen", "Knit/Wool", "Cashmere", "Silk/Satin", "Leather", "Suede",
-                   "Faux fur/Shearling", "Technical/Synthetic", "Lace", "Sequins/Metallic", "Tweed/Boucle",
-                   "Corduroy", "Velvet", "Straw/Raffia", "Canvas", "Metal", "Unclear", "Not applicable"]
-Fit = Literal["Oversized", "Relaxed", "Regular", "Fitted", "Not applicable"]
-Length = Literal["Cropped", "Hip", "Tunic-length", "Mini", "Knee", "Midi", "Maxi", "Ankle", "Full-length",
-                 "Not visible", "Not applicable"]
-Neckline = Literal["Crew", "Scoop", "V-neck", "Collared", "Turtleneck/Mock neck", "Boat", "Square",
-                   "Off-the-shoulder", "Halter", "Asymmetric", "Not visible", "Not applicable"]
-Rise = Literal["High-rise", "Mid-rise", "Low-rise", "Not visible", "Not applicable"]
-LegShape = Literal["Skinny", "Straight", "Wide", "Flare/Bootcut", "Barrel", "Tapered", "Not visible",
-                   "Not applicable"]
-Finish = Literal["Matte", "Glossy/Patent", "Metallic", "Sheer", "Not applicable"]
-DesignDetail = Literal["Ruffles", "Pleats", "Fringe", "Embroidery", "Sequins", "Cut-outs", "Buttons", "Zipper",
-                       "Chains", "Studs", "Buckle", "Belted", "Pockets", "Bow", "Puff sleeves", "Slit"]
+Pattern = Literal[VOCABULARIES["pattern"].active]
+Material = Literal[VOCABULARIES["material"].active]
+Fit = Literal[VOCABULARIES["fit"].active]
+Length = Literal[VOCABULARIES["length"].active]
+Neckline = Literal[VOCABULARIES["neckline"].active]
+Rise = Literal[VOCABULARIES["rise"].active]
+LegShape = Literal[VOCABULARIES["leg_shape"].active]
+Finish = Literal[VOCABULARIES["finish"].active]
+DesignDetail = Literal[VOCABULARIES["design_detail"].active]
 
-Framing = Literal["Full body", "Upper body", "Lower body", "Detail"]
-PhotoContext = Literal["Blogger or private person", "Brand campaign or catalog", "Editorial or street style",
-                       "Unclear"]
-Gender = Literal["Female", "Male", "Unidentifiable"]
-AgeGroup = Literal["Child", "Teen", "Young Adult", "Adult", "Senior", "Unidentifiable"]
-StyleCategory = Literal["Casual", "Smart casual", "Business/Office", "Formal/Evening", "Minimalist",
-                        "Classic/Preppy", "Bohemian", "Romantic/Feminine", "Streetwear", "Athleisure/Sporty",
-                        "Edgy/Rock", "Vintage/Retro", "Eclectic/Maximalist", "Outdoor/Utility"]
-AestheticTag = Literal["Quiet luxury/Old money", "Coastal", "Cottagecore", "Y2K", "Gorpcore", "Western", "Grunge",
-                       "Balletcore", "Scandi", "Parisian chic", "Dark academia", "Normcore", "Mob wife", "Tomboy",
-                       "Coquette", "Clean girl"]
-OverallFit = Literal["Oversized", "Fitted/Tight", "Regular/Tailored", "Mixed", "Unclear"]
-Silhouette = Literal["Oversized", "Fitted/Bodycon", "A-line", "Boxy", "Hourglass", "Draped", "Straight/Column",
-                     "Unclear"]
-ColorPaletteType = Literal["Monochrome", "Pastel", "Earth Tones", "Neon", "High Contrast", "Neutral", "Unclear"]
-ColorContrastStrategy = Literal["Monochrome", "Color-blocking", "Neutral with a pop of color", "Tonal/Gradient",
-                                "Clashing/Maximalist", "All neutrals", "Unclear"]
-Occasion = Literal["Everyday casual", "Office/Professional", "Night out/Party", "Formal/Event",
-                   "Activewear/Athleisure", "Vacation/Resort", "Unclear"]
-Setting = Literal["Urban/Street", "Nature", "Indoors/Studio", "Event/Red Carpet", "Beach", "Unclear"]
-Season = Literal["Spring", "Summer", "Autumn", "Winter", "Unclear"]
-Weather = Literal["Sunny", "Overcast", "Rain", "Snow", "Not visible"]
-HairLength = Literal["Short", "Chin-length", "Shoulder-length", "Long", "Not visible"]
-HairTexture = Literal["Straight", "Wavy", "Curly", "Coily", "Not visible"]
-HairStyleType = Literal["Down", "Ponytail", "Bun/Updo", "Braid", "Half-up", "Slicked back", "Covered", "Not visible"]
-HairColor = Literal["Black", "Dark brown", "Light brown", "Blonde", "Red/Auburn", "Grey/White", "Fashion color",
-                    "Not visible"]
-HairParting = Literal["Middle part", "Side part", "Deep side part", "No part/Swept back", "Bangs/Fringe",
-                      "Not visible"]
-HairFinish = Literal["Sleek/Smooth", "Textured/Messy", "Voluminous/Blowout", "Wet look", "Natural", "Not visible"]
-MakeupStyle = Literal["Natural/Minimal", "Bold lips", "Bold eyes", "Full glam", "Not visible"]
-PriceSegment = Literal["Fast Fashion", "Mid-range", "Luxury", "Unknown"]
-RejectionReason = Literal["Product/flat lay", "No person", "Detail crop", "Collage", "Other"]
+Framing = Literal[VOCABULARIES["framing"].active]
+PhotoContext = Literal[VOCABULARIES["photo_context"].active]
+Gender = Literal[VOCABULARIES["gender"].active]
+AgeGroup = Literal[VOCABULARIES["age_group"].active]
+StyleCategory = Literal[VOCABULARIES["style_category"].active]
+AestheticTag = Literal[VOCABULARIES["aesthetic_tag"].active]
+OverallFit = Literal[VOCABULARIES["overall_fit"].active]
+Silhouette = Literal[VOCABULARIES["silhouette"].active]
+ColorPaletteType = Literal[VOCABULARIES["color_palette_type"].active]
+ColorContrastStrategy = Literal[VOCABULARIES["color_contrast_strategy"].active]
+Occasion = Literal[VOCABULARIES["occasion"].active]
+Setting = Literal[VOCABULARIES["setting"].active]
+Season = Literal[VOCABULARIES["season"].active]
+Weather = Literal[VOCABULARIES["weather"].active]
+HairLength = Literal[VOCABULARIES["hair_length"].active]
+HairTexture = Literal[VOCABULARIES["hair_texture"].active]
+HairStyleType = Literal[VOCABULARIES["hair_style_type"].active]
+HairColor = Literal[VOCABULARIES["hair_color"].active]
+HairParting = Literal[VOCABULARIES["hair_parting"].active]
+HairFinish = Literal[VOCABULARIES["hair_finish"].active]
+MakeupStyle = Literal[VOCABULARIES["makeup_style"].active]
+PriceSegment = Literal[VOCABULARIES["price_segment"].active]
+RejectionReason = Literal[VOCABULARIES["rejection_reason"].active]
 CountryBasis = Literal["model", "domain", "feed_language", "unknown"]
 
 

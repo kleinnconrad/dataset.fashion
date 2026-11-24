@@ -22,6 +22,8 @@ dataset.fashion/
 │       ├── daily_scraper.yml       # pipeline run, Tuesdays and Fridays 02:07 Europe/Berlin
 │       ├── email_notify.yml        # commit comment after data commits
 │       └── source_discovery.yml    # weekly maintenance, Sundays 12:00 UTC
+├── config/
+│   └── vocabularies.toml           # fixed lists of values with their history
 ├── data/
 │   ├── YYYY/MM/fashion_analytics_YYYY-MM-DD.json   # records of one UTC day
 │   └── state/                      # sources.json, posts.json, images.json, run_log.jsonl

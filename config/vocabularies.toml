@@ -1,0 +1,542 @@
+# Fixed lists of values (vocabularies) of the extracted attributes, schema 2.x.
+#
+# The lists are slowly changing dimensions: values are added and retired over time, and the
+# history stays in this file. Gemini is offered the values without `retired`; records keep the
+# value that was offered when they were extracted. src/schema.py builds the response schema from
+# this file, so a change here changes the extraction hash of the following records.
+#
+# Rules:
+# - A value is never renamed and never reused for another meaning. A changed meaning needs a new value.
+# - added:   first day on which the value is offered to Gemini (records of schema 2.0 start on 2026-10-11).
+# - retired: first day on which the value is no longer offered. The entry stays in the list.
+# - parent:  value of the same list that a new value refines (e.g. after splitting a value), so that
+#            series can be summed up to the earlier values.
+# - category (garment_type only): the garment category of the type, a value of garment_category.
+# - Every change is listed with its date in the change log of the lists in README.md.
+
+# Used by: category of garments (derived from garment_type)
+[garment_category]
+values = [
+    { value = "Top", added = 2026-10-11 },
+    { value = "Bottom", added = 2026-10-11 },
+    { value = "Dress/One-piece", added = 2026-10-11 },
+    { value = "Outerwear", added = 2026-10-11 },
+    { value = "Footwear", added = 2026-10-11 },
+    { value = "Bag", added = 2026-10-11 },
+    { value = "Headwear", added = 2026-10-11 },
+    { value = "Eyewear", added = 2026-10-11 },
+    { value = "Jewelry", added = 2026-10-11 },
+    { value = "Belt", added = 2026-10-11 },
+    { value = "Scarf/Neckwear", added = 2026-10-11 },
+    { value = "Hair accessory", added = 2026-10-11 },
+    { value = "Hosiery", added = 2026-10-11 },
+    { value = "Other", added = 2026-10-11 },
+]
+
+# Used by: garment_type
+[garment_type]
+values = [
+    { value = "T-shirt", category = "Top", added = 2026-10-11 },
+    { value = "Tank top/Camisole", category = "Top", added = 2026-10-11 },
+    { value = "Blouse", category = "Top", added = 2026-10-11 },
+    { value = "Button-up shirt", category = "Top", added = 2026-10-11 },
+    { value = "Polo shirt", category = "Top", added = 2026-10-11 },
+    { value = "Sweater", category = "Top", added = 2026-10-11 },
+    { value = "Cardigan", category = "Top", added = 2026-10-11 },
+    { value = "Sweatshirt/Hoodie", category = "Top", added = 2026-10-11 },
+    { value = "Bodysuit", category = "Top", added = 2026-10-11 },
+    { value = "Tunic", category = "Top", added = 2026-10-11 },
+    { value = "Jeans", category = "Bottom", added = 2026-10-11 },
+    { value = "Trousers", category = "Bottom", added = 2026-10-11 },
+    { value = "Leggings", category = "Bottom", added = 2026-10-11 },
+    { value = "Shorts", category = "Bottom", added = 2026-10-11 },
+    { value = "Skirt", category = "Bottom", added = 2026-10-11 },
+    { value = "Joggers/Sweatpants", category = "Bottom", added = 2026-10-11 },
+    { value = "Dress", category = "Dress/One-piece", added = 2026-10-11 },
+    { value = "Jumpsuit", category = "Dress/One-piece", added = 2026-10-11 },
+    { value = "Romper/Playsuit", category = "Dress/One-piece", added = 2026-10-11 },
+    { value = "Overalls", category = "Dress/One-piece", added = 2026-10-11 },
+    { value = "Blazer", category = "Outerwear", added = 2026-10-11 },
+    { value = "Coat", category = "Outerwear", added = 2026-10-11 },
+    { value = "Trench coat", category = "Outerwear", added = 2026-10-11 },
+    { value = "Denim jacket", category = "Outerwear", added = 2026-10-11 },
+    { value = "Leather jacket", category = "Outerwear", added = 2026-10-11 },
+    { value = "Bomber jacket", category = "Outerwear", added = 2026-10-11 },
+    { value = "Puffer/Quilted jacket", category = "Outerwear", added = 2026-10-11 },
+    { value = "Shacket/Overshirt", category = "Outerwear", added = 2026-10-11 },
+    { value = "Vest/Gilet", category = "Outerwear", added = 2026-10-11 },
+    { value = "Cape/Poncho", category = "Outerwear", added = 2026-10-11 },
+    { value = "Other jacket", category = "Outerwear", added = 2026-10-11 },
+    { value = "Sneakers", category = "Footwear", added = 2026-10-11 },
+    { value = "Ankle boots", category = "Footwear", added = 2026-10-11 },
+    { value = "Knee-high boots", category = "Footwear", added = 2026-10-11 },
+    { value = "Loafers", category = "Footwear", added = 2026-10-11 },
+    { value = "Ballet flats", category = "Footwear", added = 2026-10-11 },
+    { value = "Sandals", category = "Footwear", added = 2026-10-11 },
+    { value = "Heels/Pumps", category = "Footwear", added = 2026-10-11 },
+    { value = "Mules/Slides", category = "Footwear", added = 2026-10-11 },
+    { value = "Clogs", category = "Footwear", added = 2026-10-11 },
+    { value = "Espadrilles", category = "Footwear", added = 2026-10-11 },
+    { value = "Oxfords/Brogues", category = "Footwear", added = 2026-10-11 },
+    { value = "Tote", category = "Bag", added = 2026-10-11 },
+    { value = "Shoulder bag", category = "Bag", added = 2026-10-11 },
+    { value = "Crossbody bag", category = "Bag", added = 2026-10-11 },
+    { value = "Clutch", category = "Bag", added = 2026-10-11 },
+    { value = "Backpack", category = "Bag", added = 2026-10-11 },
+    { value = "Belt bag", category = "Bag", added = 2026-10-11 },
+    { value = "Top-handle bag", category = "Bag", added = 2026-10-11 },
+    { value = "Baseball cap", category = "Headwear", added = 2026-10-11 },
+    { value = "Beanie", category = "Headwear", added = 2026-10-11 },
+    { value = "Wide-brim hat", category = "Headwear", added = 2026-10-11 },
+    { value = "Bucket hat", category = "Headwear", added = 2026-10-11 },
+    { value = "Beret", category = "Headwear", added = 2026-10-11 },
+    { value = "Sunglasses", category = "Eyewear", added = 2026-10-11 },
+    { value = "Glasses", category = "Eyewear", added = 2026-10-11 },
+    { value = "Necklace", category = "Jewelry", added = 2026-10-11 },
+    { value = "Earrings", category = "Jewelry", added = 2026-10-11 },
+    { value = "Bracelet", category = "Jewelry", added = 2026-10-11 },
+    { value = "Ring", category = "Jewelry", added = 2026-10-11 },
+    { value = "Watch", category = "Jewelry", added = 2026-10-11 },
+    { value = "Brooch", category = "Jewelry", added = 2026-10-11 },
+    { value = "Belt", category = "Belt", added = 2026-10-11 },
+    { value = "Scarf", category = "Scarf/Neckwear", added = 2026-10-11 },
+    { value = "Bandana", category = "Scarf/Neckwear", added = 2026-10-11 },
+    { value = "Tie", category = "Scarf/Neckwear", added = 2026-10-11 },
+    { value = "Headband", category = "Hair accessory", added = 2026-10-11 },
+    { value = "Hair clip", category = "Hair accessory", added = 2026-10-11 },
+    { value = "Hair bow", category = "Hair accessory", added = 2026-10-11 },
+    { value = "Scrunchie", category = "Hair accessory", added = 2026-10-11 },
+    { value = "Tights", category = "Hosiery", added = 2026-10-11 },
+    { value = "Socks", category = "Hosiery", added = 2026-10-11 },
+    { value = "Other", category = "Other", added = 2026-10-11 },
+]
+
+# Used by: primary_color, secondary_color, outfit_colors
+[base_color]
+values = [
+    { value = "Black", added = 2026-10-11 },
+    { value = "White", added = 2026-10-11 },
+    { value = "Grey", added = 2026-10-11 },
+    { value = "Beige/Cream", added = 2026-10-11 },
+    { value = "Brown", added = 2026-10-11 },
+    { value = "Camel/Tan", added = 2026-10-11 },
+    { value = "Navy", added = 2026-10-11 },
+    { value = "Blue", added = 2026-10-11 },
+    { value = "Light blue", added = 2026-10-11 },
+    { value = "Denim blue", added = 2026-10-11 },
+    { value = "Green", added = 2026-10-11 },
+    { value = "Olive", added = 2026-10-11 },
+    { value = "Red", added = 2026-10-11 },
+    { value = "Burgundy", added = 2026-10-11 },
+    { value = "Pink", added = 2026-10-11 },
+    { value = "Purple", added = 2026-10-11 },
+    { value = "Yellow", added = 2026-10-11 },
+    { value = "Orange", added = 2026-10-11 },
+    { value = "Gold", added = 2026-10-11 },
+    { value = "Silver", added = 2026-10-11 },
+    { value = "Multicolor", added = 2026-10-11 },
+]
+
+# Used by: pattern
+[pattern]
+values = [
+    { value = "Solid", added = 2026-10-11 },
+    { value = "Striped", added = 2026-10-11 },
+    { value = "Plaid/Check", added = 2026-10-11 },
+    { value = "Floral", added = 2026-10-11 },
+    { value = "Polka dot", added = 2026-10-11 },
+    { value = "Animal print", added = 2026-10-11 },
+    { value = "Abstract/Graphic", added = 2026-10-11 },
+    { value = "Geometric", added = 2026-10-11 },
+    { value = "Paisley", added = 2026-10-11 },
+    { value = "Camouflage", added = 2026-10-11 },
+    { value = "Logo/Text", added = 2026-10-11 },
+    { value = "Other", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: material
+[material]
+values = [
+    { value = "Denim", added = 2026-10-11 },
+    { value = "Cotton", added = 2026-10-11 },
+    { value = "Linen", added = 2026-10-11 },
+    { value = "Knit/Wool", added = 2026-10-11 },
+    { value = "Cashmere", added = 2026-10-11 },
+    { value = "Silk/Satin", added = 2026-10-11 },
+    { value = "Leather", added = 2026-10-11 },
+    { value = "Suede", added = 2026-10-11 },
+    { value = "Faux fur/Shearling", added = 2026-10-11 },
+    { value = "Technical/Synthetic", added = 2026-10-11 },
+    { value = "Lace", added = 2026-10-11 },
+    { value = "Sequins/Metallic", added = 2026-10-11 },
+    { value = "Tweed/Boucle", added = 2026-10-11 },
+    { value = "Corduroy", added = 2026-10-11 },
+    { value = "Velvet", added = 2026-10-11 },
+    { value = "Straw/Raffia", added = 2026-10-11 },
+    { value = "Canvas", added = 2026-10-11 },
+    { value = "Metal", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: fit
+[fit]
+values = [
+    { value = "Oversized", added = 2026-10-11 },
+    { value = "Relaxed", added = 2026-10-11 },
+    { value = "Regular", added = 2026-10-11 },
+    { value = "Fitted", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: length
+[length]
+values = [
+    { value = "Cropped", added = 2026-10-11 },
+    { value = "Hip", added = 2026-10-11 },
+    { value = "Tunic-length", added = 2026-10-11 },
+    { value = "Mini", added = 2026-10-11 },
+    { value = "Knee", added = 2026-10-11 },
+    { value = "Midi", added = 2026-10-11 },
+    { value = "Maxi", added = 2026-10-11 },
+    { value = "Ankle", added = 2026-10-11 },
+    { value = "Full-length", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: neckline
+[neckline]
+values = [
+    { value = "Crew", added = 2026-10-11 },
+    { value = "Scoop", added = 2026-10-11 },
+    { value = "V-neck", added = 2026-10-11 },
+    { value = "Collared", added = 2026-10-11 },
+    { value = "Turtleneck/Mock neck", added = 2026-10-11 },
+    { value = "Boat", added = 2026-10-11 },
+    { value = "Square", added = 2026-10-11 },
+    { value = "Off-the-shoulder", added = 2026-10-11 },
+    { value = "Halter", added = 2026-10-11 },
+    { value = "Asymmetric", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: rise
+[rise]
+values = [
+    { value = "High-rise", added = 2026-10-11 },
+    { value = "Mid-rise", added = 2026-10-11 },
+    { value = "Low-rise", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: leg_shape
+[leg_shape]
+values = [
+    { value = "Skinny", added = 2026-10-11 },
+    { value = "Straight", added = 2026-10-11 },
+    { value = "Wide", added = 2026-10-11 },
+    { value = "Flare/Bootcut", added = 2026-10-11 },
+    { value = "Barrel", added = 2026-10-11 },
+    { value = "Tapered", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: finish
+[finish]
+values = [
+    { value = "Matte", added = 2026-10-11 },
+    { value = "Glossy/Patent", added = 2026-10-11 },
+    { value = "Metallic", added = 2026-10-11 },
+    { value = "Sheer", added = 2026-10-11 },
+    { value = "Not applicable", added = 2026-10-11 },
+]
+
+# Used by: design_details
+[design_detail]
+values = [
+    { value = "Ruffles", added = 2026-10-11 },
+    { value = "Pleats", added = 2026-10-11 },
+    { value = "Fringe", added = 2026-10-11 },
+    { value = "Embroidery", added = 2026-10-11 },
+    { value = "Sequins", added = 2026-10-11 },
+    { value = "Cut-outs", added = 2026-10-11 },
+    { value = "Buttons", added = 2026-10-11 },
+    { value = "Zipper", added = 2026-10-11 },
+    { value = "Chains", added = 2026-10-11 },
+    { value = "Studs", added = 2026-10-11 },
+    { value = "Buckle", added = 2026-10-11 },
+    { value = "Belted", added = 2026-10-11 },
+    { value = "Pockets", added = 2026-10-11 },
+    { value = "Bow", added = 2026-10-11 },
+    { value = "Puff sleeves", added = 2026-10-11 },
+    { value = "Slit", added = 2026-10-11 },
+]
+
+# Used by: framing
+[framing]
+values = [
+    { value = "Full body", added = 2026-10-11 },
+    { value = "Upper body", added = 2026-10-11 },
+    { value = "Lower body", added = 2026-10-11 },
+    { value = "Detail", added = 2026-10-11 },
+]
+
+# Used by: photo_context
+[photo_context]
+values = [
+    { value = "Blogger or private person", added = 2026-10-11 },
+    { value = "Brand campaign or catalog", added = 2026-10-11 },
+    { value = "Editorial or street style", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: gender
+[gender]
+values = [
+    { value = "Female", added = 2026-10-11 },
+    { value = "Male", added = 2026-10-11 },
+    { value = "Unidentifiable", added = 2026-10-11 },
+]
+
+# Used by: age_group
+[age_group]
+values = [
+    { value = "Child", added = 2026-10-11 },
+    { value = "Teen", added = 2026-10-11 },
+    { value = "Young Adult", added = 2026-10-11 },
+    { value = "Adult", added = 2026-10-11 },
+    { value = "Senior", added = 2026-10-11 },
+    { value = "Unidentifiable", added = 2026-10-11 },
+]
+
+# Used by: style_category
+[style_category]
+values = [
+    { value = "Casual", added = 2026-10-11 },
+    { value = "Smart casual", added = 2026-10-11 },
+    { value = "Business/Office", added = 2026-10-11 },
+    { value = "Formal/Evening", added = 2026-10-11 },
+    { value = "Minimalist", added = 2026-10-11 },
+    { value = "Classic/Preppy", added = 2026-10-11 },
+    { value = "Bohemian", added = 2026-10-11 },
+    { value = "Romantic/Feminine", added = 2026-10-11 },
+    { value = "Streetwear", added = 2026-10-11 },
+    { value = "Athleisure/Sporty", added = 2026-10-11 },
+    { value = "Edgy/Rock", added = 2026-10-11 },
+    { value = "Vintage/Retro", added = 2026-10-11 },
+    { value = "Eclectic/Maximalist", added = 2026-10-11 },
+    { value = "Outdoor/Utility", added = 2026-10-11 },
+]
+
+# Used by: aesthetic_tags
+[aesthetic_tag]
+values = [
+    { value = "Quiet luxury/Old money", added = 2026-10-11 },
+    { value = "Coastal", added = 2026-10-11 },
+    { value = "Cottagecore", added = 2026-10-11 },
+    { value = "Y2K", added = 2026-10-11 },
+    { value = "Gorpcore", added = 2026-10-11 },
+    { value = "Western", added = 2026-10-11 },
+    { value = "Grunge", added = 2026-10-11 },
+    { value = "Balletcore", added = 2026-10-11 },
+    { value = "Scandi", added = 2026-10-11 },
+    { value = "Parisian chic", added = 2026-10-11 },
+    { value = "Dark academia", added = 2026-10-11 },
+    { value = "Normcore", added = 2026-10-11 },
+    { value = "Mob wife", added = 2026-10-11 },
+    { value = "Tomboy", added = 2026-10-11 },
+    { value = "Coquette", added = 2026-10-11 },
+    { value = "Clean girl", added = 2026-10-11 },
+]
+
+# Used by: overall_fit
+[overall_fit]
+values = [
+    { value = "Oversized", added = 2026-10-11 },
+    { value = "Fitted/Tight", added = 2026-10-11 },
+    { value = "Regular/Tailored", added = 2026-10-11 },
+    { value = "Mixed", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: silhouette
+[silhouette]
+values = [
+    { value = "Oversized", added = 2026-10-11 },
+    { value = "Fitted/Bodycon", added = 2026-10-11 },
+    { value = "A-line", added = 2026-10-11 },
+    { value = "Boxy", added = 2026-10-11 },
+    { value = "Hourglass", added = 2026-10-11 },
+    { value = "Draped", added = 2026-10-11 },
+    { value = "Straight/Column", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: color_palette_type
+[color_palette_type]
+values = [
+    { value = "Monochrome", added = 2026-10-11 },
+    { value = "Pastel", added = 2026-10-11 },
+    { value = "Earth Tones", added = 2026-10-11 },
+    { value = "Neon", added = 2026-10-11 },
+    { value = "High Contrast", added = 2026-10-11 },
+    { value = "Neutral", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: color_contrast_strategy
+[color_contrast_strategy]
+values = [
+    { value = "Monochrome", added = 2026-10-11 },
+    { value = "Color-blocking", added = 2026-10-11 },
+    { value = "Neutral with a pop of color", added = 2026-10-11 },
+    { value = "Tonal/Gradient", added = 2026-10-11 },
+    { value = "Clashing/Maximalist", added = 2026-10-11 },
+    { value = "All neutrals", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: occasion
+[occasion]
+values = [
+    { value = "Everyday casual", added = 2026-10-11 },
+    { value = "Office/Professional", added = 2026-10-11 },
+    { value = "Night out/Party", added = 2026-10-11 },
+    { value = "Formal/Event", added = 2026-10-11 },
+    { value = "Activewear/Athleisure", added = 2026-10-11 },
+    { value = "Vacation/Resort", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: setting
+[setting]
+values = [
+    { value = "Urban/Street", added = 2026-10-11 },
+    { value = "Nature", added = 2026-10-11 },
+    { value = "Indoors/Studio", added = 2026-10-11 },
+    { value = "Event/Red Carpet", added = 2026-10-11 },
+    { value = "Beach", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: season
+[season]
+values = [
+    { value = "Spring", added = 2026-10-11 },
+    { value = "Summer", added = 2026-10-11 },
+    { value = "Autumn", added = 2026-10-11 },
+    { value = "Winter", added = 2026-10-11 },
+    { value = "Unclear", added = 2026-10-11 },
+]
+
+# Used by: weather
+[weather]
+values = [
+    { value = "Sunny", added = 2026-10-11 },
+    { value = "Overcast", added = 2026-10-11 },
+    { value = "Rain", added = 2026-10-11 },
+    { value = "Snow", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_length
+[hair_length]
+values = [
+    { value = "Short", added = 2026-10-11 },
+    { value = "Chin-length", added = 2026-10-11 },
+    { value = "Shoulder-length", added = 2026-10-11 },
+    { value = "Long", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_texture
+[hair_texture]
+values = [
+    { value = "Straight", added = 2026-10-11 },
+    { value = "Wavy", added = 2026-10-11 },
+    { value = "Curly", added = 2026-10-11 },
+    { value = "Coily", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_style_type
+[hair_style_type]
+values = [
+    { value = "Down", added = 2026-10-11 },
+    { value = "Ponytail", added = 2026-10-11 },
+    { value = "Bun/Updo", added = 2026-10-11 },
+    { value = "Braid", added = 2026-10-11 },
+    { value = "Half-up", added = 2026-10-11 },
+    { value = "Slicked back", added = 2026-10-11 },
+    { value = "Covered", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_color
+[hair_color]
+values = [
+    { value = "Black", added = 2026-10-11 },
+    { value = "Dark brown", added = 2026-10-11 },
+    { value = "Light brown", added = 2026-10-11 },
+    { value = "Blonde", added = 2026-10-11 },
+    { value = "Red/Auburn", added = 2026-10-11 },
+    { value = "Grey/White", added = 2026-10-11 },
+    { value = "Fashion color", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_parting
+[hair_parting]
+values = [
+    { value = "Middle part", added = 2026-10-11 },
+    { value = "Side part", added = 2026-10-11 },
+    { value = "Deep side part", added = 2026-10-11 },
+    { value = "No part/Swept back", added = 2026-10-11 },
+    { value = "Bangs/Fringe", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: hair_finish
+[hair_finish]
+values = [
+    { value = "Sleek/Smooth", added = 2026-10-11 },
+    { value = "Textured/Messy", added = 2026-10-11 },
+    { value = "Voluminous/Blowout", added = 2026-10-11 },
+    { value = "Wet look", added = 2026-10-11 },
+    { value = "Natural", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: makeup_style
+[makeup_style]
+values = [
+    { value = "Natural/Minimal", added = 2026-10-11 },
+    { value = "Bold lips", added = 2026-10-11 },
+    { value = "Bold eyes", added = 2026-10-11 },
+    { value = "Full glam", added = 2026-10-11 },
+    { value = "Not visible", added = 2026-10-11 },
+]
+
+# Used by: price_segment
+[price_segment]
+values = [
+    { value = "Fast Fashion", added = 2026-10-11 },
+    { value = "Mid-range", added = 2026-10-11 },
+    { value = "Luxury", added = 2026-10-11 },
+    { value = "Unknown", added = 2026-10-11 },
+]
+
+# Used by: reason of rejected images
+[rejection_reason]
+values = [
+    { value = "Product/flat lay", added = 2026-10-11 },
+    { value = "No person", added = 2026-10-11 },
+    { value = "Detail crop", added = 2026-10-11 },
+    { value = "Collage", added = 2026-10-11 },
+    { value = "Other", added = 2026-10-11 },
+]
