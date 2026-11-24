@@ -9,6 +9,7 @@ A fashion analytics pipeline that runs twice a week (Tuesdays and Fridays) in Gi
 - [Sources and Post Selection](#sources-and-post-selection)
 - [Source Lifecycle](#source-lifecycle)
 - [Record Schema 2.0](#record-schema-20)
+- [Vocabularies](#vocabularies)
 - [Data and State Files](#data-and-state-files)
 - [Workflows](#workflows)
 - [Configuration](#configuration)
@@ -198,12 +199,32 @@ Each record describes one outfit of one person in one post. The models are defin
 
 - **Outfit attributes:** framing, photo context (blogger or private person, brand campaign, editorial), gender, age group, style category and aesthetic tags, overall fit, silhouette, color palette and contrast, occasion, setting, season, weather, hair and makeup.
 - **Garments:** one entry per garment, shoe and accessory with type and derived category, description, primary and secondary color, pattern, material, fit, length, neckline, rise, leg shape, finish and design details.
-- **Fixed vocabularies:** all attributes except the free-text details use fixed lists of values. Absence is explicit: "Not visible" for attributes of the photo, "Not applicable" for garment attributes that do not apply to the item.
+- **Fixed vocabularies:** all attributes except the free-text details use fixed lists of values. Absence is explicit: "Not visible" for attributes of the photo, "Not applicable" for garment attributes that do not apply to the item. The lists and their history are kept in [config/vocabularies.toml](config/vocabularies.toml) (see [Vocabularies](#vocabularies)).
 - **Provenance:** record id, schema version, model, extraction hash (prompt, schema and model settings), scrape and publish dates, source domain, country and language, post URL, title and tags, and the dHash and size of each image. Image URLs are not stored.
+- **Unlisted values (schema 2.1):** where no listed value describes an attribute well, Gemini still uses the closest value and names the term it would use (`unlisted_values`, field and term). Each record states the version of the lists it was extracted with (`vocabulary_version`, the day of the latest change of the lists). Records of schema 2.0 have neither field; the switch to schema 2.1 changed the extraction hash.
 
 **Legacy records.** The records collected before the switch to schema 2.0 use schema 1.x. They were taken from blog homepages without deduplication and without publish dates, and many describe the same photos repeatedly. They remain unchanged in `data/` and are reported separately in the overview.
 
 **Model changes.** Until 2026-11-03 the records were extracted by `gemini-2.5-flash` (thinking budget 2048 tokens, temperature 0.2), which Google retires in the Gemini API on 2026-12-01. The records of 2026-11-06 were extracted by `gemini-3.5-flash-lite`, which was replaced after this one run. Later records are extracted by `gemini-3.8-flash` (thinking level `LOW`; Gemini 3 and later models ignore custom temperatures). The fields `model` and `extraction_hash` separate the records of the three models.
+
+## Vocabularies
+
+The fixed lists of values are kept in [config/vocabularies.toml](config/vocabularies.toml), one list per attribute group (35 lists, 352 values on 2026-10-11). They are slowly changing dimensions: every value has the day from which it is offered to Gemini (`added`), and a value that is no longer offered keeps its entry with the day of its retirement (`retired`), so the file shows which values were valid at any time. `src/schema.py` builds the response schema from the active values; a change of the file therefore changes the extraction hash of the following records.
+
+- **Values are permanent.** A value is never renamed and never reused for another meaning; a changed meaning needs a new value.
+- **Splits keep the series comparable.** A value that refines an existing value names it as `parent`, so that series can be summed up to the earlier values.
+- **Every change is logged** in the table below with its date.
+
+**Monthly review.** On the first day of every month, `vocabulary_review.yml` runs [src/vocabulary_review.py](src/vocabulary_review.py), which checks whether 26 of the lists are up to date. Framing, photo context, gender, age group, season, weather, price segment, the rejection reasons and the garment categories are classification frames and are changed by hand only. Gemini classifies every outfit with the closest listed value, so a term that a list lacks does not show up in the data by itself; the review therefore uses two sources:
+
+1. **Research:** Gemini with Google Search checks the lists in five requests (garment types; colors, patterns, materials and surface details; cut and fit; styles, aesthetics, color strategies, occasions and settings; hair and makeup). It proposes terms that are established in fashion writing of the last 24 months or clearly emerging in the last 12 months and identifiable in outfit photos, and values that are no longer in use. A proposal needs sources from at least two websites, must not duplicate or reuse a value, and names the value it refines as `parent`; at most three proposals per list.
+2. **Data:** the records of the last 90 days. The terms that Gemini named as missing (`unlisted_values`), the aesthetics outside the list (`aesthetic_other`) and the descriptions of garments of the type "Other" are counted per outfit and blog and given to the research as hints; terms with at least 10 outfits from 3 blogs that the research does not add are listed in the report. The report also names values with at least 60 % of the observations of their list (candidates for a split), values without observations in the window, and the shares of "Other" and "Unclear".
+
+The valid additions are written to `config/vocabularies.toml` (with the day of the review as `added`) and to the change log, and the workflow opens or updates a pull request with the report as its description; nothing changes until it is merged. Retirements and splits are reported only and carried out by hand. Without proposed changes, the report is in the job summary of the workflow run. The review sends five requests with Google Search per month.
+
+| Date | List | Change |
+|---|---|---|
+| 2026-10-11 | all | Lists of schema 2.0 (35 lists, 352 values). |
 
 ## Data and State Files
 
@@ -223,6 +244,7 @@ The state files have a version key and one entry per line, and they are written 
 |---|---|---|
 | `daily_scraper.yml` | Tuesdays and Fridays, 02:07 Europe/Berlin | Runs the pipeline, updates the overview and commits `data/` and `README.md` |
 | `source_discovery.yml` | Sundays, 12:00 UTC | Re-checks dormant and broken sources, looks up countries, discovers new blogs and commits `data/state/` |
+| `vocabulary_review.yml` | First day of every month, 12:17 UTC | Checks whether the fixed lists are up to date and opens a pull request with the proposed additions (see [Vocabularies](#vocabularies)) |
 | `email_notify.yml` | After data commits | Posts a commit comment that mentions the repository owner |
 | `ci.yml` | Pull requests, pushes to `main` | Lint, tests and commit message checks |
 
@@ -232,6 +254,8 @@ Manual runs (`workflow_dispatch`) accept a `mode`:
 - `normal`: same as the scheduled run.
 - `shadow`: runs on a copy of the state in a temporary folder and uploads it as an artifact; nothing is committed. Shadow runs use the same API key and quota as the scheduled runs.
 - `dry-run` (`daily_scraper.yml` only): no model calls; uploads a report of the selected posts and images.
+
+`vocabulary_review.yml` also accepts `research`: turned off, the review evaluates the data only, without Gemini. Its `shadow` mode uploads the report and the proposed changes instead of opening a pull request.
 
 ## Configuration
 
@@ -289,7 +313,7 @@ uv run pytest
 ## Setup
 
 1. Add the repository secret `GEMINI_API_KEY` under **Settings > Secrets and variables > Actions**. For local runs, put it into a `.env` file.
-2. Allow workflows to push to the repository under **Settings > Actions > General > Workflow permissions**.
+2. Allow workflows to push to the repository under **Settings > Actions > General > Workflow permissions**, and allow GitHub Actions to create and approve pull requests, so that the vocabulary review can open its pull request.
 3. The first pipeline run seeds the source registry from the legacy records, which takes about a minute.
 
 Copyright (c) 2026 Conrad Kleinn. All rights reserved.

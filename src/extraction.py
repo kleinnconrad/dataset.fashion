@@ -25,12 +25,15 @@ from pydantic import ValidationError
 from schema import (
     GARMENT_CATEGORY_BY_TYPE,
     GARMENT_TYPES_BY_CATEGORY,
+    VOCABULARY_OF_FIELD,
     BaseColor,
     Material,
     OutfitExtraction,
     PostExtraction,
+    UnlistedValue,
     describe_models,
 )
+from vocabularies import VOCABULARIES
 from settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,9 @@ MAX_QUOTA_WAIT_S = 120.0
 MAX_TEXT_CHARS = 8_000
 MAX_LINK_TEXTS = 40
 MAX_IMAGE_CONTEXT_CHARS = 300
+# Limits of the values that the model names as missing from a list (unlisted_values)
+MAX_UNLISTED_CHARS = 60
+MAX_UNLISTED_VALUES = 8
 # Image preprocessing; part of the extraction hash
 IMAGE_MAX_SIDE_PX = 1024
 IMAGE_JPEG_QUALITY = 85
@@ -74,6 +80,7 @@ Rules:
 5. Use "Not visible" for the weather of indoor photos and whenever the sky or the conditions cannot be seen.
 6. Name a brand only if it appears in the post title, text, tags, image captions or link texts. Do not infer brands from the look of an item.
 7. The post text can help to identify items, but do not describe items that are not visible in the images.
+8. If no listed value describes an attribute well, use the closest listed value and name the term you would use in unlisted_values. Name established fashion terms, not descriptions of the single item.
 """
 
 IMAGE_LABEL_TEMPLATE = "Image {number}{context}:"
@@ -484,6 +491,30 @@ def _shift_indexes(extraction: PostExtraction, offset: int) -> PostExtraction:
     return extraction.model_copy(update={"outfits": outfits, "rejected_images": rejected})
 
 
+def clean_unlisted_values(values: Sequence[UnlistedValue]) -> list[UnlistedValue]:
+    """Normalizes the values that the model names as missing from a list.
+
+    Values that are empty, longer than MAX_UNLISTED_CHARS, repeated, or already
+    in the list of the attribute (ignoring case) are dropped.
+
+    Args:
+        values: The unlisted values of one outfit.
+
+    Returns:
+        list[UnlistedValue]: The cleaned values, at most MAX_UNLISTED_VALUES.
+    """
+    cleaned: dict[tuple[str, str], UnlistedValue] = {}
+    for item in values:
+        value = _clean_text(item.value)
+        if not value or len(value) > MAX_UNLISTED_CHARS:
+            continue
+        listed = {known.casefold() for known in VOCABULARIES[VOCABULARY_OF_FIELD[item.field]].active}
+        key = (item.field, value.casefold())
+        if key[1] not in listed and key not in cleaned:
+            cleaned[key] = UnlistedValue(field=item.field, value=value)
+    return list(cleaned.values())[:MAX_UNLISTED_VALUES]
+
+
 def _clean_outfit(outfit: OutfitExtraction, reference_text: str) -> OutfitExtraction:
     """Normalizes the free text, lists and the focal index of one outfit.
 
@@ -512,6 +543,7 @@ def _clean_outfit(outfit: OutfitExtraction, reference_text: str) -> OutfitExtrac
         "aesthetic_tags": list(dict.fromkeys(outfit.aesthetic_tags)),
         "brand_mentions": _verified_brands(outfit.brand_mentions, reference_text),
         "garments": garments,
+        "unlisted_values": clean_unlisted_values(outfit.unlisted_values),
     })
 
 

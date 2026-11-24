@@ -134,7 +134,8 @@ def test_run_stores_records_state_and_log(setup: dict[str, Any]) -> None:
     assert dict(stats.posts) == {"done": 2}
     records = stored(setup)
     assert [record["post_url"] for record in records] == POSTS
-    assert {record["schema_version"] for record in records} == {"2.0"}
+    assert {record["schema_version"] for record in records} == {"2.1"}
+    assert {record["vocabulary_version"] for record in records} == {"2026-10-11"}
     assert all(len(record["images"]) == 2 for record in records)
     state = PipelineState.load(setup["settings"].state_dir)
     assert {entry.status for entry in state.posts.values()} == {"done"}

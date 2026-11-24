@@ -36,6 +36,7 @@
       "makeup_style": "Natural/Minimal",
       "brand_mentions": ["Everlane", "everlane", "Gucci"],
       "price_segment": "Mid-range",
+      "unlisted_values": [{"field": "hair_style_type", "value": "Space buns"}],
       "image_indexes": [2, 1, 2, 9]
     },
     {
@@ -71,6 +72,7 @@
       "makeup_style": "Bold lips",
       "brand_mentions": [],
       "price_segment": "Unknown",
+      "unlisted_values": [],
       "image_indexes": [4]
     }
   ],
