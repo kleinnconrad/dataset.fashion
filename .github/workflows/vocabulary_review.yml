@@ -1,0 +1,111 @@
+name: Monthly Vocabulary Review
+run-name: Monthly vocabulary review (${{ inputs.mode || 'normal' }})
+
+on:
+  schedule:
+    - cron: '17 12 1 * *'   # first day of every month, 12:17 UTC
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'normal: review the lists and open or update a pull request with the proposed changes; shadow: review and upload the report and the proposed changes as an artifact'
+        type: choice
+        options:
+          - normal
+          - shadow
+        default: normal
+      research:
+        description: 'Check the lists with Gemini and Google Search (off: data only)'
+        type: boolean
+        default: true
+
+jobs:
+  review-vocabularies:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      # Starts the CI workflow on the review branch
+      actions: write
+    env:
+      MODE: ${{ inputs.mode || 'normal' }}
+      RESEARCH: ${{ (github.event_name == 'workflow_dispatch' && inputs.research == false) && 'off' || 'on' }}
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v7
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: uv sync --frozen
+
+    # Exits with 1 if the research stopped early; the pull request is still opened with what was found
+    - name: Review Vocabularies
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        args=(--report "$RUNNER_TEMP/vocabulary_review.md")
+        if [ "$RESEARCH" = "off" ]; then
+          args+=(--no-research)
+        fi
+        status=0
+        uv run python src/vocabulary_review.py "${args[@]}" || status=$?
+        if [ -f "$RUNNER_TEMP/vocabulary_review.md" ]; then
+          cat "$RUNNER_TEMP/vocabulary_review.md" >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"
+
+    # One review pull request at a time: the branch is rebuilt from the base branch every month
+    - name: Open or Update Pull Request
+      if: ${{ !cancelled() && env.MODE == 'normal' }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BASE: ${{ github.ref_name }}
+        OWNER: ${{ github.repository_owner }}
+      run: |
+        if git diff --quiet -- config/vocabularies.toml; then
+          echo "The review proposes no changes of the lists; the report is in the job summary."
+          exit 0
+        fi
+        month=$(date -u +%Y-%m)
+        branch="vocabulary-review"
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git switch -C "$branch"
+        git add config/vocabularies.toml README.md
+        git commit -m "chore(vocabularies): vocabulary review $month"
+        git push --force origin "$branch"
+        { echo "@$OWNER"; echo; cat "$RUNNER_TEMP/vocabulary_review.md"; } > "$RUNNER_TEMP/pr_body.md"
+        number=$(gh pr list --head "$branch" --base "$BASE" --state open --json number --jq '.[0].number // empty')
+        if [ -n "$number" ]; then
+          gh pr edit "$number" --title "Vocabulary review $month" --body-file "$RUNNER_TEMP/pr_body.md"
+        else
+          gh pr create --base "$BASE" --head "$branch" --title "Vocabulary review $month" \
+            --body-file "$RUNNER_TEMP/pr_body.md"
+        fi
+        # Pull requests opened with the GITHUB_TOKEN start no workflows; the checks are started here
+        gh workflow run ci.yml --ref "$branch"
+
+    - name: Collect Shadow Output
+      if: ${{ !cancelled() && env.MODE == 'shadow' }}
+      run: |
+        mkdir -p "$RUNNER_TEMP/shadow"
+        git diff -- config/vocabularies.toml README.md > "$RUNNER_TEMP/shadow/proposed_changes.diff"
+        if [ -f "$RUNNER_TEMP/vocabulary_review.md" ]; then
+          cp "$RUNNER_TEMP/vocabulary_review.md" "$RUNNER_TEMP/shadow/"
+        fi
+
+    - name: Upload Shadow Output
+      if: ${{ !cancelled() && env.MODE == 'shadow' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: vocabulary-review-shadow-${{ github.run_id }}
+        path: ${{ runner.temp }}/shadow
+        retention-days: 14

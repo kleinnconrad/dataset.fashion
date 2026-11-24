@@ -56,7 +56,7 @@ def test_overview_summarizes_both_schemas_and_the_registry(tmp_path: Path) -> No
     make_dataset(tmp_path)
     overview = build_overview(tmp_path, NOW)
     assert "**Last updated:** 2026-10-11 01:30 UTC" in overview
-    assert "**Schema 2.0 records:** 4 outfits from 2 posts of 1 sources, published 2026-10-08 to 2026-10-08" in overview
+    assert "**Schema 2.x records:** 4 outfits from 2 posts of 1 sources, published 2026-10-08 to 2026-10-08" in overview
     assert "**Images reused across posts:** 1" in overview
     assert "**Legacy records (schema 1.x):** 2 records in 1 files (2026-06-14 to 2026-06-14)" in overview
     assert "**Sources:** 1 active, 0 probation, 1 dormant, 0 broken, 0 rejected, 0 retired" in overview
@@ -67,7 +67,7 @@ def test_overview_summarizes_both_schemas_and_the_registry(tmp_path: Path) -> No
 
 
 def test_overview_without_schema_2_records(tmp_path: Path) -> None:
-    assert "**Schema 2.0 records:** none yet" in build_overview(tmp_path, NOW)
+    assert "**Schema 2.x records:** none yet" in build_overview(tmp_path, NOW)
 
 
 def test_readme_section_is_replaced(tmp_path: Path) -> None:

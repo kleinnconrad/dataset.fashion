@@ -220,11 +220,11 @@ def build_overview(data_dir: Path, now: datetime) -> str:
         sources = {record.get("source_id") for record in current}
         published = sorted(record["published_date"] for record in current if record.get("published_date"))
         period = f", published {published[0]} to {published[-1]}" if published else ""
-        lines.append(f"- **Schema {SCHEMA_VERSION} records:** {len(current):,} outfits from {len(posts):,} posts "
+        lines.append(f"- **Schema 2.x records:** {len(current):,} outfits from {len(posts):,} posts "
                      f"of {len(sources):,} sources{period}")
         lines.append(f"- **Images reused across posts:** {reused_images(current)}")
     else:
-        lines.append(f"- **Schema {SCHEMA_VERSION} records:** none yet")
+        lines.append("- **Schema 2.x records:** none yet")
     if legacy:
         lines.append(f"- **Legacy records (schema 1.x):** {len(legacy):,} records in {len(legacy_dates)} files "
                      f"({min(legacy_dates)} to {max(legacy_dates)}); collected without deduplication and "

@@ -6,8 +6,9 @@ This document describes the structure of the pipeline: the directory layout, the
 - [1. Directory Structure](#1-directory-structure)
 - [2. Pipeline Run](#2-pipeline-run)
 - [3. Weekly Run](#3-weekly-run)
-- [4. Failure Handling](#4-failure-handling)
-- [5. Setup Steps](#5-setup-steps)
+- [4. Monthly Vocabulary Review](#4-monthly-vocabulary-review)
+- [5. Failure Handling](#5-failure-handling)
+- [6. Setup Steps](#6-setup-steps)
 
 ---
 
@@ -21,7 +22,8 @@ dataset.fashion/
 │       ├── ci.yml                  # lint, tests, commit messages
 │       ├── daily_scraper.yml       # pipeline run, Tuesdays and Fridays 02:07 Europe/Berlin
 │       ├── email_notify.yml        # commit comment after data commits
-│       └── source_discovery.yml    # weekly maintenance, Sundays 12:00 UTC
+│       ├── source_discovery.yml    # weekly maintenance, Sundays 12:00 UTC
+│       └── vocabulary_review.yml   # review of the fixed lists, first day of every month
 ├── config/
 │   └── vocabularies.toml           # fixed lists of values with their history
 ├── data/
@@ -70,7 +72,19 @@ The workflow commits `data/state/`.
 
 ---
 
-## 4. Failure Handling
+## 4. Monthly Vocabulary Review
+
+`src/vocabulary_review.py` checks whether the fixed lists in `config/vocabularies.toml` are up to date (see the README, section Vocabularies):
+
+1. Read the schema 2.x records of the last 90 days and count, per reviewed list, the observations of each value and the terms that Gemini named as missing (`unlisted_values`, `aesthetic_other`, descriptions of garments of the type "Other"), per outfit and blog.
+2. Ask Gemini with Google Search, in one request per group of lists, for missing established or emerging terms and for values that are no longer in use, with the data as hints. Check each proposal: known list and action, no existing or retired value, an active parent, a garment category for garment types, sources from at least two domains, at most three proposals per list.
+3. Append the valid additions to their lists (`added` = day of the review) and to the change log in the README, and write the report: additions, proposed retirements, frequent unlisted terms that were not added, dominant and unused values, shares of the catch-all values, and the rejected proposals.
+
+The workflow opens or updates a pull request on the branch `vocabulary-review`, which is rebuilt every month, and starts the CI workflow on it. A quota or API error ends the research; the pull request is opened with what was found, and the workflow fails visibly.
+
+---
+
+## 5. Failure Handling
 
 - **One post fails:** the post stays pending and is retried in later runs. Failures that concern the post itself (missing page, unusable model response) count as attempts; after 3 attempts the post is given up. Server errors, rate limits and quota errors do not count.
 - **Quota or call budget reached:** extraction stops; all processed posts are saved.
@@ -81,8 +95,8 @@ The workflow commits `data/state/`.
 
 ---
 
-## 5. Setup Steps
+## 6. Setup Steps
 
 1. Add the `GEMINI_API_KEY` repository secret under **Settings > Secrets and variables > Actions**. For local runs, set it in a `.env` file.
-2. Allow workflows to push to the repository under **Settings > Actions > General > Workflow permissions**.
+2. Allow workflows to push to the repository under **Settings > Actions > General > Workflow permissions**, and allow GitHub Actions to create and approve pull requests (vocabulary review).
 3. For local runs, install the browser once: `uv run playwright install chromium`.

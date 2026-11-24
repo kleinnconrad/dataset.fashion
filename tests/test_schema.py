@@ -23,6 +23,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "post_extraction.json"
 # of field names, types or required flags must come with a new SCHEMA_VERSION.
 SCHEMA_SNAPSHOTS = {
     "2.0": "203566060a94c0d44a71d53837d4013e961b5f2f072baa998e1413cc4cd0855a",
+    # 2.1: unlisted_values (filled by the model) and vocabulary_version (records)
+    "2.1": "0d70ccbe343498c8f81ea39756a8d556830b5d4aa0126a9871f6a507b5efb27d",
 }
 
 

@@ -16,9 +16,9 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from vocabularies import VOCABULARIES
+from vocabularies import VOCABULARIES, vocabulary_version
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
 # The lists of values are kept with their history in config/vocabularies.toml (see src/vocabularies.py);
 # Gemini is offered the active values in the order of the file
@@ -74,7 +74,31 @@ HairFinish = Literal[VOCABULARIES["hair_finish"].active]
 MakeupStyle = Literal[VOCABULARIES["makeup_style"].active]
 PriceSegment = Literal[VOCABULARIES["price_segment"].active]
 RejectionReason = Literal[VOCABULARIES["rejection_reason"].active]
+# Attributes whose lists Gemini can report as incomplete (unlisted_values), and the list of each. The aesthetics
+# have their own free-text field (aesthetic_other); framing, photo context, gender, age group, season, weather,
+# price segment and rejection reasons are classification frames that are changed by hand only.
+VOCABULARY_OF_FIELD: dict[str, str] = {
+    "garment_type": "garment_type", "primary_color": "base_color", "secondary_color": "base_color",
+    "pattern": "pattern", "material": "material", "fit": "fit", "length": "length", "neckline": "neckline",
+    "rise": "rise", "leg_shape": "leg_shape", "finish": "finish", "design_details": "design_detail",
+    "style_category": "style_category", "overall_fit": "overall_fit", "silhouette": "silhouette",
+    "color_palette_type": "color_palette_type", "color_contrast_strategy": "color_contrast_strategy",
+    "occasion": "occasion", "setting": "setting", "hair_length": "hair_length", "hair_texture": "hair_texture",
+    "hair_style_type": "hair_style_type", "hair_color": "hair_color", "hair_parting": "hair_parting",
+    "hair_finish": "hair_finish", "makeup_style": "makeup_style",
+}
+# Lists that the monthly vocabulary review checks (src/vocabulary_review.py)
+REVIEWED_LISTS: tuple[str, ...] = tuple(dict.fromkeys((*VOCABULARY_OF_FIELD.values(), "aesthetic_tag")))
+# Version of the lists offered to Gemini: the day of their latest change
+VOCABULARY_VERSION = vocabulary_version(VOCABULARIES).isoformat()
+UnlistedField = Literal[tuple(VOCABULARY_OF_FIELD)]
 CountryBasis = Literal["model", "domain", "feed_language", "unknown"]
+
+
+class UnlistedValue(BaseModel):
+    """A value that the list of an attribute does not contain, as named by the model."""
+    field: UnlistedField = Field(description="Attribute of the outfit or of one of its garments whose list has no fitting value.")
+    value: str = Field(description="The term you would use instead, in one to four words, e.g. 'Space buns' for hair_style_type or 'Mesh' for material.")
 
 
 class Garment(BaseModel):
@@ -124,6 +148,7 @@ class OutfitAttributes(BaseModel):
     makeup_style: MakeupStyle = Field(description="Makeup style of the person.")
     brand_mentions: list[str] = Field(description="Brands of this outfit that are named in the post title, text, tags, image captions or link texts. Do not infer brands from appearance. Empty list if none.")
     price_segment: PriceSegment = Field(description="Price segment suggested by the named brands or the text. 'Unknown' without such evidence.")
+    unlisted_values: list[UnlistedValue] = Field(description="Attributes of this outfit or its garments for which no listed value describes what is visible well, with the term you would use. The attribute itself still gets the closest listed value. Use aesthetic_other, not this list, for aesthetics. Empty list if the listed values fit.")
 
     @field_validator("layering_complexity")
     @classmethod
@@ -163,12 +188,13 @@ class ImageRef(BaseModel):
 
 
 class OutfitRecord(OutfitAttributes):
-    """One outfit record of schema 2.0 as written to the dataset."""
+    """One outfit record of schema 2.x as written to the dataset."""
     garments: list[GarmentRecord] = Field(description="Every visible garment, shoe and accessory of this outfit.")
     record_id: str = Field(description="Stable id derived from the post URL, the image hashes and the position of the outfit in the post.")
     schema_version: str = Field(description="Version of the record schema.")
     model: str = Field(description="Gemini model that produced the record.")
     extraction_hash: str = Field(description="Hash of the prompt, response schema, model settings and image preprocessing. Records with the same hash were extracted under the same conditions.")
+    vocabulary_version: str = Field(description="Version of the fixed lists offered to Gemini (YYYY-MM-DD): the day of the latest change in config/vocabularies.toml. Missing in records before schema 2.1.")
     date_scraped: str = Field(description="UTC date of the extraction (YYYY-MM-DD).")
     published_date: Optional[str] = Field(description="Publish date of the post from its feed (YYYY-MM-DD).")
     source_id: str = Field(description="Domain of the blog, without www.")
@@ -214,7 +240,7 @@ def region_for_country(country: Optional[str]) -> str:
 
 
 SCHEMA_MODELS: tuple[type[BaseModel], ...] = (
-    Garment, OutfitExtraction, RejectedImage, PostExtraction, GarmentRecord, ImageRef, OutfitRecord,
+    UnlistedValue, Garment, OutfitExtraction, RejectedImage, PostExtraction, GarmentRecord, ImageRef, OutfitRecord,
 )
 
 
